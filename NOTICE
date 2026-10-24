@@ -1,0 +1,49 @@
+LegacyLyrion A200
+Copyright (c) 2026 h33ted
+
+Third-party material
+--------------------
+
+LegacyLyrion A200 is built with, but does not include, the following. The
+build scripts download them from Maven Central into lib/, which is not part
+of this repository:
+
+- Eclipse Compiler for Java (ECJ) 4.6.1, by the Eclipse Foundation
+  (https://www.eclipse.org/jdt/core/), licensed under the Eclipse Public
+  License 1.0: https://www.eclipse.org/legal/epl-v10.html
+- MicroEmulator 2.0.4 CLDC 1.1 and MIDP 2.0 API jars, by Bartek Teodorczyk
+  and the MicroEmulator team (https://github.com/barteo/microemu), licensed
+  under the GNU Lesser General Public License 2.1 or the Apache License 2.0:
+  https://www.apache.org/licenses/LICENSE-2.0
+
+The files in stubs/javax/microedition/sensor are minimal compile-time
+stand-ins for the JSR-256 Mobile Sensor API, written for this project from
+the public API signatures. They are never packaged; the phone provides the
+real implementation.
+
+Spotify browsing and playback rely on the Spotty plugin for Lyrion Music
+Server by Michael Herger (https://github.com/michaelherger/Spotty-Plugin),
+which builds on librespot (https://github.com/librespot-org/librespot).
+LegacyLyrion A200 does not include any Spotty code; it talks to the plugin
+through Lyrion's standard controller (Jive) menus. Spotty must be installed
+separately on the Lyrion server, and is credited and licensed by its own
+authors.
+
+YouTube Music browsing and playback rely on the YouTube Music for LMS plugin
+by schmij97 (https://github.com/schmij97/lms-ytmusic), which uses yt-dlp
+(https://github.com/yt-dlp/yt-dlp). LegacyLyrion A200 does not include any
+of its code; it talks to the plugin through the same Jive menus. The plugin
+must be installed separately on the Lyrion server.
+
+The menu logic (Jive items and command building) follows LegacyLyrion for
+Android (https://github.com/h33ted/LegacyLyrion) by the same author.
+
+The visual style is drawn entirely in code (src/ll/Style.java) in the manner
+of Sony Ericsson's own 2009 media applications; it contains no Sony Ericsson
+artwork.
+
+Lyrion Music Server, Squeezebox and SlimProto belong to their respective
+owners. Spotify is a trademark of Spotify AB. YouTube and YouTube Music are
+trademarks of Google LLC. Sony Ericsson, Aino and Walkman are trademarks of
+their respective owners. This project is not affiliated with Spotify,
+Google, Sony, the Lyrion project or Logitech.

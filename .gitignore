@@ -1,0 +1,25 @@
+# build output (release jars are published as GitHub release assets)
+build/
+dist/
+dist-test/
+
+# downloaded by build.sh / build.cmd from Maven Central
+lib/*.jar
+
+# local emulator setup: test builds carry a preset server address
+tools/emu/*.jar
+tools/emu/*.jad
+tools/emu/shots/
+
+# old local screenshots (the published ones are in docs/screenshots/)
+/screenshots/
+
+# editors and OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# workflow files waiting to be moved into .github/workflows/
+/_move-to-.github-workflows/
