@@ -97,7 +97,7 @@ You can skip this step if you only want to use the phone as a remote.
 
 ## 4. Install the app on the phone
 
-1. Download from the **[latest release](https://github.com/h33ted/LegacyLyrion-A200/releases/latest)** on a computer (these phones can't open GitHub; its encryption is too new for them):
+1. Download from the **[latest release](https://github.com/h33ted/LegacyLyrion-SE-A200/releases/latest)** on a computer (these phones can't open GitHub; its encryption is too new for them):
    - **Aino:** `LegacyLyrion-Aino.jar` and `LegacyLyrion-Aino.jad`
    - **W995, C905, W705 and the other 240x320 phones:** `LegacyLyrion-A200.jar` and `LegacyLyrion-A200.jad`
 2. Copy **both** files into the same folder on the phone or its memory card, for example `Other` or `Games`. USB in *mass storage* (file transfer) mode, a card reader, or Bluetooth all work.
@@ -216,8 +216,8 @@ If the server runs on Windows and phones can't find it, can't connect, or show t
 
 Press **\*** twice on the home menu, or open *More → Diagnostics*. The log shows the app version, the player name and ID, which plugins were found, and every failed request together with the command that was sent, plus every SlimProto command and stream URL when the phone plays. Errors also appear as a full-screen message that points to it.
 
-When you [report an issue](https://github.com/h33ted/LegacyLyrion-A200/issues), include the phone model, firmware version, and the lines from this log around the error. **Remove your server's IP address** before posting if you'd rather not share it.
+When you [report an issue](https://github.com/h33ted/LegacyLyrion-SE-A200/issues), include the phone model, firmware version, and the lines from this log around the error. **Remove your server's IP address** before posting if you'd rather not share it.
 
 ---
 
-Source, issues and releases: **https://github.com/h33ted/LegacyLyrion-A200**
+Source, issues and releases: **https://github.com/h33ted/LegacyLyrion-SE-A200**
