@@ -36,6 +36,8 @@ LegacyLyrion A200 is the Java ME sibling of [LegacyLyrion for Android](https://g
 
 ## Screenshots
 
+**Aino** (240x432, touch and keypad)
+
 <table>
 <tr>
 <td align="center"><img src="docs/screenshots/first-run.png" width="200" alt="First start: Found Spotify and YouTube Music"><br><sub>First start finds the plugins</sub></td>
@@ -44,10 +46,21 @@ LegacyLyrion A200 is the Java ME sibling of [LegacyLyrion for Android](https://g
 <td align="center"><img src="docs/screenshots/now-playing.png" width="200" alt="Now Playing with album artwork"><br><sub>Now Playing</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/youtube-music-list.png" width="200" alt="YouTube Music playlist list"><br><sub>YouTube Music, Aino (240x432)</sub></td>
-<td align="center"><img src="docs/screenshots/home-youtube-music-240x320.png" width="200" alt="YouTube Music home on a 240x320 screen"><br><sub>Home, W995 / C905 / W705 (240x320)</sub></td>
-<td align="center"><img src="docs/screenshots/options-menu-240x320.png" width="200" alt="More menu with Play now, Play next, Add to queue"><br><sub>More menu (240x320)</sub></td>
 <td align="center"><img src="docs/screenshots/home-spotify.png" width="200" alt="Spotify home with the source rail"><br><sub>Source rail: Spotify, YouTube Music, library</sub></td>
+<td align="center"><img src="docs/screenshots/youtube-music-featured.png" width="200" alt="YouTube Music home with Featured artwork"><br><sub>YouTube Music home</sub></td>
+<td align="center"><img src="docs/screenshots/youtube-music-list.png" width="200" alt="YouTube Music playlist list"><br><sub>Featured playlists</sub></td>
+<td align="center"><img src="docs/screenshots/search-categories.png" width="200" alt="Search result categories"><br><sub>Songs, albums, artists, playlists</sub></td>
+</tr>
+</table>
+
+**W995, C905, W705 and the other 240x320 phones** (keypad)
+
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/home-youtube-music-240x320.png" width="200" alt="YouTube Music home on a 240x320 screen"><br><sub>Home</sub></td>
+<td align="center"><img src="docs/screenshots/options-menu-240x320.png" width="200" alt="More menu with Play now, Play next, Add to queue"><br><sub>More menu</sub></td>
+<td align="center"><img src="docs/screenshots/now-playing-240x320.png" width="200" alt="Now Playing on a 240x320 screen"><br><sub>Now Playing</sub></td>
+<td align="center"><img src="docs/screenshots/playlist-240x320.png" width="200" alt="Playlist list on a 240x320 screen"><br><sub>Playlists</sub></td>
 </tr>
 </table>
 
