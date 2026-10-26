@@ -4,6 +4,7 @@ import java.util.Calendar;
 
 import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
+import javax.microedition.lcdui.Image;
 
 /**
  * Docked Now Playing (Aino in its stand), modelled on the phone's standby clock. By default only
@@ -15,6 +16,15 @@ final class DockScreen extends NowPlayingScreen {
     private static final Font DATE = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_MEDIUM);
     private static final Font CLOCK_FALLBACK = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_LARGE);
     private static final int SHOW_MS = 5000;
+    private static final int CLOCK_ALPHA = 75;               // percent: slightly see-through, like the standby clock
+    private static final int SCROLL_PAUSE = 1500, SCROLL_SPEED = 30, SCROLL_GAP = 40;   // ms, px/s, px
+
+    private Image clockImg;                                  // the clock over its piece of background, redrawn each minute
+    private String clockKey;
+    private long scrollStart;
+    private String scrollKey;
+    private volatile boolean scrolling, animating;
+    private volatile int animGen;
 
     private BigText big;
     private boolean bigTried;
@@ -68,10 +78,10 @@ final class DockScreen extends NowPlayingScreen {
         // right column, everything aligned to its right edge like the standby clock
         int left = ax + s + 16, right = w - 12, cw = right - left;
         BigText b = bigText();
-        int px = Math.min(cw * 10 / 25, h * 2 / 5);
-        int clockH = b != null ? px * 3 / 4 : CLOCK_FALLBACK.getHeight();
+        int px = Math.min(cw * 10 / 26, h * 2 / 5);
+        int clockH = b != null ? px * 82 / 100 : CLOCK_FALLBACK.getHeight();
         int br2 = ctl ? Math.max(10, Math.min(16, h / 14)) : 0;
-        int total = clockH + 4 + DATE.getHeight() + 14 + Style.BIG.getHeight() + Style.SMALL.getHeight()
+        int total = clockH + 8 + DATE.getHeight() + 14 + Style.BIG.getHeight() + Style.SMALL.getHeight()
                 + (ctl ? 12 + 2 * br2 + 6 : 0);
         int y = Math.max(4, (h - total) / 2);
 
@@ -80,7 +90,7 @@ final class DockScreen extends NowPlayingScreen {
         String clock = hh + ":" + (mm < 10 ? "0" : "") + mm;
         if (b != null) {
             try {
-                b.draw(g, clock, right, y - px / 5, px);    // the SVG box has room above the digits
+                drawClock(g, b, clock, right, y - px / 5, px, w, h);   // the SVG box has room above the digits
             } catch (Throwable t) {
                 app.log("Dock clock: SVG failed (" + t + ")");
                 big = null;
@@ -92,7 +102,7 @@ final class DockScreen extends NowPlayingScreen {
             g.setColor(Style.TEXT);
             g.drawString(clock, right, y, Graphics.TOP | Graphics.RIGHT);
         }
-        y += clockH + 4;
+        y += clockH + 8;
         g.setFont(DATE);
         g.setColor(Style.TEXT);
         int day = c.get(Calendar.DAY_OF_MONTH), mon = c.get(Calendar.MONTH) + 1;
@@ -100,14 +110,19 @@ final class DockScreen extends NowPlayingScreen {
                 right, y, Graphics.TOP | Graphics.RIGHT);
         y += DATE.getHeight() + 14;
 
-        // title and album
-        g.setFont(Style.BIG);
+        // title and album, scrolling when they don't fit
+        String sub = album.length() > 0 ? album : artist;
+        long now = System.currentTimeMillis();
+        if (!(track + "\n" + sub).equals(scrollKey)) {
+            scrollKey = track + "\n" + sub;
+            scrollStart = now;
+        }
         g.setColor(Style.TEXT);
-        g.drawString(Style.fit(track, Style.BIG, cw), right, y, Graphics.TOP | Graphics.RIGHT);
+        boolean moving = line(g, track, Style.BIG, left, right, y, w, h, now);
         y += Style.BIG.getHeight();
-        g.setFont(Style.SMALL);
         g.setColor(Style.TEXT_DIM);
-        g.drawString(Style.fit(album.length() > 0 ? album : artist, Style.SMALL, cw), right, y, Graphics.TOP | Graphics.RIGHT);
+        moving |= line(g, sub, Style.SMALL, left, right, y, w, h, now);
+        scrolling = moving;
         y += Style.SMALL.getHeight();
 
         volY = -1000;                               // no volume bar here: up/down keys still work
@@ -132,6 +147,64 @@ final class DockScreen extends NowPlayingScreen {
         circle(g, cx - br * 3, by, br * 3 / 4, Style.G_PREV, false);
         circle(g, cx, by, br, playing ? Style.G_PAUSE : Style.G_PLAY, true);
         circle(g, cx + br * 3, by, br * 3 / 4, Style.G_NEXT, false);
+    }
+
+    /** The clock from a cached image: SVG is rendered only when the minute or the layout changes. */
+    private void drawClock(Graphics g, BigText b, String text, int right, int y0, int px, int w, int h) throws Exception {
+        int iw = px * 3, ih = px * 6 / 5, x0 = right - iw;
+        String k = text + "/" + px + "/" + right + "/" + y0 + "/" + w + "x" + h;
+        if (!k.equals(clockKey)) {
+            Image img = Image.createImage(iw, ih);
+            Graphics ig = img.getGraphics();
+            ig.translate(-x0, -y0);                       // the background behind the clock, so translucency works
+            Style.background(ig, w, h);
+            ig.translate(x0, y0);
+            b.draw(ig, text, iw, 0, px, CLOCK_ALPHA);
+            clockImg = img;
+            clockKey = k;
+        }
+        g.drawImage(clockImg, x0, y0, Graphics.TOP | Graphics.LEFT);
+    }
+
+    /**
+     * One line, right-aligned when it fits; otherwise it waits, then scrolls round, marquee-style.
+     * Returns true while it is scrolling.
+     */
+    private boolean line(Graphics g, String text, Font f, int left, int right, int y, int w, int h, long now) {
+        g.setFont(f);
+        int cw = right - left, tw = f.stringWidth(text);
+        if (tw <= cw) {
+            g.drawString(text, right, y, Graphics.TOP | Graphics.RIGHT);
+            return false;
+        }
+        int loop = tw + SCROLL_GAP;
+        long cycle = SCROLL_PAUSE + (long) loop * 1000 / SCROLL_SPEED;
+        long ph = (now - scrollStart) % cycle;
+        int off = ph < SCROLL_PAUSE ? 0 : (int) ((ph - SCROLL_PAUSE) * SCROLL_SPEED / 1000);
+        g.clipRect(left, y, cw, f.getHeight());
+        g.drawString(text, left - off, y, Graphics.TOP | Graphics.LEFT);
+        g.drawString(text, left - off + loop, y, Graphics.TOP | Graphics.LEFT);
+        g.setClip(0, 0, w, h);
+        return true;
+    }
+
+    void shown() {
+        super.shown();
+        animating = true;
+        final int my = ++animGen;                         // one animator per visit
+        new Thread(new Runnable() {                       // about 14 frames a second, only while text scrolls
+            public void run() {
+                while (animating && my == animGen) {
+                    try { Thread.sleep(70); } catch (InterruptedException e) {}
+                    if (scrolling && animating) app.shell.repaint();
+                }
+            }
+        }).start();
+    }
+
+    void hidden() {
+        animating = false;
+        super.hidden();
     }
 
     /** SvgText if the phone has JSR-226, else null (MIDP's largest font is used). */

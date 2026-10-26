@@ -18,10 +18,10 @@ public final class SvgText implements BigText {
     private ScalableImage img;
     private int iw, ih;
 
-    public void draw(Graphics g, String text, int x, int y, int px) throws Exception {
+    public void draw(Graphics g, String text, int x, int y, int px, int alpha) throws Exception {
         String k = text + "/" + px;
         if (!k.equals(key)) {                       // rebuilt only when the minute or the size changes
-            iw = px * (text.length() + 1);
+            iw = px * 3;                            // room for "23:59"; text is anchored at the right edge
             ih = px * 6 / 5;
             String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" baseProfile=\"tiny\""
                     + " width=\"" + iw + "\" height=\"" + ih + "\" viewBox=\"0 0 " + iw + " " + ih + "\">"
@@ -35,6 +35,7 @@ public final class SvgText implements BigText {
         sg.bindTarget(g);
         try {
             sg.setRenderingQuality(ScalableGraphics.RENDERING_QUALITY_HIGH);
+            sg.setTransparency(alpha / 100f);
             sg.render(x - iw, y, img);
         } finally {
             sg.releaseTarget();
