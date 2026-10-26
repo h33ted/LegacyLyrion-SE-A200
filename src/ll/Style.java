@@ -117,18 +117,70 @@ final class Style {
         g.drawRoundRect(x, y, w - 1, h - 1, 6, 6);
     }
 
-    /**
-     * The focused entry of the home menu, as in Sony Ericsson's own media apps: faint light glass the
-     * background glow shows through, a thin light-grey frame and a soft highlight along the top.
-     */
+    private static Image box;
+    private static String boxKey;
+
     static void focusBox(Graphics g, int x, int y, int w, int h) {
+        focusBox(g, x, y, w, h, 0, 0, 0, 0);
+    }
+
+    /**
+     * The focused entry of the home menu, as in Sony Ericsson's own media apps: light glass the
+     * background glow shows through (brighter in the upper half), a thin light-grey frame, and
+     * optionally a dark see-through text field inside (fw > 0). The Aino draws images without
+     * their alpha, so the glass is worked out here from the background pixels and drawn solid.
+     */
+    static void focusBox(Graphics g, int x, int y, int w, int h, int fx, int fy, int fw, int fh) {
         if (w <= 4 || h <= 4) return;
-        Image p = glassFor("b", w, h, 0x7a7a7a, 0x3a3a3a, 0x48);
-        g.drawImage(p, x, y, Graphics.TOP | Graphics.LEFT);
-        g.setColor(0x8c8c8c);
-        g.drawRect(x, y, w - 1, h - 1);
-        g.setColor(0x6a6a6a);
-        g.drawLine(x + 1, y + 1, x + w - 2, y + 1);
+        Shell s = Shell.instance;
+        int sw = s.lw(), sh = s.lh();
+        String k = x + "," + y + "," + w + "," + h + "," + fx + "," + fy + "," + fw + "," + fh + "," + sw + "x" + sh;
+        if (!k.equals(boxKey)) {
+            box = glassBox(x, y, w, h, fx, fy, fw, fh, sw, sh);
+            boxKey = k;
+        }
+        g.drawImage(box, x, y, Graphics.TOP | Graphics.LEFT);
+    }
+
+    private static Image glassBox(int x, int y, int w, int h, int fx, int fy, int fw, int fh, int sw, int sh) {
+        int[] px = new int[w * h];                      // what's behind it: the glow (black off screen)
+        int x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(sw, x + w), y1 = Math.min(sh, y + h);
+        if (x1 > x0 && y1 > y0) glowFor(sw, sh).getRGB(px, (y0 - y) * w + (x0 - x), w, x0, y0, x1 - x0, y1 - y0);
+        int top = Math.max(1, h * 45 / 100);
+        for (int j = 0; j < h; j++) {
+            int a = j < top ? 64 - j * 30 / top : 18;   // white: a glossy upper half, faint below
+            for (int i = 0; i < w; i++) {
+                int p = px[j * w + i];
+                boolean side = i == 0 || i == w - 1, cap = j == 0 || j == h - 1;
+                if (side && cap) {
+                    p = blend(p, 0xb0b0b0, 90);         // softened corners
+                } else if (side || cap) {
+                    p = blend(p, 0xb4b4b4, 190);        // thin light-grey frame
+                } else if (j == 1) {
+                    p = blend(p, 0xffffff, 96);         // highlight along the top
+                } else {
+                    p = blend(p, 0xffffff, a);
+                }
+                if (fw > 0) {                           // the search field: darker glass, grey frame
+                    int fi = x + i - fx, fj = y + j - fy;
+                    if (fi >= 0 && fj >= 0 && fi < fw && fj < fh) {
+                        boolean fe = fi == 0 || fj == 0 || fi == fw - 1 || fj == fh - 1;
+                        p = fe ? blend(p, 0x8c8c8c, 200) : blend(p, 0x000000, fj == 1 ? 200 : 150);
+                    }
+                }
+                px[j * w + i] = 0xff000000 | (p & 0xffffff);
+            }
+        }
+        return Image.createRGBImage(px, w, h, false);
+    }
+
+    /** c blended towards t by a/255. */
+    private static int blend(int c, int t, int a) {
+        int r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+        r += (((t >> 16) & 255) - r) * a / 255;
+        g += (((t >> 8) & 255) - g) * a / 255;
+        b += ((t & 255) - b) * a / 255;
+        return (r << 16) | (g << 8) | b;
     }
 
     private static Image translucent(int w, int h, int top, int bottom, int alpha) {

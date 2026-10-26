@@ -251,22 +251,17 @@ final class HomeScreen extends Screen implements Runnable {
 
     private void paintFocus(Graphics g, Entry e, int w, int iconX, int textX, int P, int bh) {
         int bx = railX + 10, bw = w - bx - 6;
-        Style.focusBox(g, bx, boxY, bw, bh);
+        int py = boxY + P - 2, px = bx + 8, pw = bw - 16;
+        int fh = Style.ROW.getHeight() + 8;
+        if (e.preview == P_SEARCH) Style.focusBox(g, bx, boxY, bw, bh, px, py, pw, fh);
+        else Style.focusBox(g, bx, boxY, bw, bh);
         Style.glyph(g, e.glyph, iconX - 2, boxY + P / 2, 32, Style.ICON_FOCUS);
         g.setFont(Style.MENU_BOLD);
         g.setColor(Style.TEXT);
         g.drawString(Style.fit(e.label, Style.MENU_BOLD, w - textX - 10), textX, boxY + (P - Style.MENU_BOLD.getHeight()) / 2,
                 Graphics.TOP | Graphics.LEFT);
 
-        int py = boxY + P - 2, px = bx + 8, pw = bw - 16;
-        if (e.preview == P_SEARCH) {
-            int fh = Style.ROW.getHeight() + 8;
-            g.setColor(0x0c0c0c);
-            g.fillRect(px, py, pw, fh);
-            g.setColor(0x7a7a7a);
-            g.drawRect(px, py, pw - 1, fh - 1);
-            g.setColor(0x2a2a2a);
-            g.drawLine(px + 1, py + 1, px + pw - 2, py + 1);
+        if (e.preview == P_SEARCH) {                    // the field itself is drawn into the glass box
             g.setFont(Style.ROW);
             if (query.length() > 0) {                   // what's being typed, with a cursor
                 String q = query.toString();

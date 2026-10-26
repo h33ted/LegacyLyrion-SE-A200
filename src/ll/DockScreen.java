@@ -32,8 +32,6 @@ final class DockScreen extends NowPlayingScreen {
 
     private BigText big;
     private boolean bigTried;
-    private ImageMaker maker;                                 // NokiaImages: transparent images for the clock
-    private boolean makerTried;
     private long showUntil;
 
     DockScreen(LegacyLyrion app) {
@@ -218,11 +216,11 @@ final class DockScreen extends NowPlayingScreen {
         int iw = px * 3, ih = px * 6 / 5, x0 = right - iw;
         String k = text + "/" + px + "/" + right + "/" + y0 + "/" + w + "x" + h + (n ? "/n" : "");
         if (!k.equals(clockKey)) {
-            Image img = transparentImage(iw, ih);
+            // MIDP mutable images are opaque, and the Aino's SVG renderer draws nothing onto DirectUtils'
+            // transparent ones, so the clock goes onto a copy of what is behind it
+            Image img;
             Graphics ig;
-            if (img != null) {                            // transparent: the clock alone, drawn over whatever is behind
-                ig = img.getGraphics();
-            } else if (n) {
+            if (n) {
                 img = Image.createImage(iw, ih);
                 ig = img.getGraphics();
                 ig.setColor(0x000000);
@@ -280,28 +278,6 @@ final class DockScreen extends NowPlayingScreen {
     void hidden() {
         animating = false;
         super.hidden();
-    }
-
-    /** A transparent mutable image (DirectUtils), or null where the phone can't make one. */
-    private Image transparentImage(int w, int h) {
-        if (!makerTried) {
-            makerTried = true;
-            try {
-                Class.forName("com.nokia.mid.ui.DirectUtils");
-                maker = (ImageMaker) Class.forName("ll.NokiaImages").newInstance();
-                app.log("Dock clock: transparent image (DirectUtils)");
-            } catch (Throwable t) {
-                maker = null;
-            }
-        }
-        if (maker == null) return null;
-        try {
-            return maker.transparent(w, h);
-        } catch (Throwable t) {
-            app.log("Dock clock: DirectUtils failed (" + t + ")");
-            maker = null;
-            return null;
-        }
     }
 
     /** SvgText if the phone has JSR-226, else null (MIDP's largest font is used). */
