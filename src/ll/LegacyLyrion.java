@@ -47,9 +47,8 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     int rotMode = Shell.ROT_AUTO;
     int dockMode = Docking.ASK;
     int dockDelay = 2;                  // seconds sideways and still before docked mode
-    int keepAwake = Docking.AWAKE_STEADY;
     Docking docking;                    // only on the Aino
-    private ChoiceGroup fRot, fDock, fAwake;
+    private ChoiceGroup fRot, fDock;
     private TextField fDockWait;
     private final StringBuffer logBuf = new StringBuffer();
     private boolean started;
@@ -123,7 +122,6 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                 }
                 if (f.length > 8 && f[8].length() == 1) dockMode = f[8].charAt(0) - '0';
                 if (f.length > 9) dockDelay = seconds(f[9], dockDelay);
-                if (f.length > 10 && f[10].length() == 1) keepAwake = f[10].charAt(0) - '0';
             }
             rs.closeRecordStore();
         } catch (Exception ignored) {}
@@ -142,7 +140,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         try {
             String v = lms.host + "\n" + lms.port + "\n" + player + "\n" + phoneMac + "\n" + (phonePlays ? "1" : "0")
                     + "\n" + (phoneMode == Slim.MODE_DIRECT ? "1" : "0") + "\n" + rotMode + "\n" + (sourceSaved ? String.valueOf(source) : "")
-                    + "\n" + dockMode + "\n" + dockDelay + "\n" + keepAwake;
+                    + "\n" + dockMode + "\n" + dockDelay;
             byte[] b = v.getBytes("UTF-8");
             RecordStore rs = RecordStore.openRecordStore("legacylyrion", true);
             if (rs.getNumRecords() == 0) rs.addRecord(b, 0, b.length);
@@ -233,10 +231,6 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
             fDockWait = new TextField("Wait before docking (seconds)", String.valueOf(dockDelay), 3, TextField.NUMERIC);
             settingsForm.append(fDock);
             settingsForm.append(fDockWait);
-            fAwake = new ChoiceGroup("Keep the screen on when docked", Choice.EXCLUSIVE,
-                    new String[]{"Steady (one long request)", "Refresh every second", "Off (phone's own light setting)"}, null);
-            fAwake.setSelectedIndex(keepAwake >= 0 && keepAwake <= 2 ? keepAwake : Docking.AWAKE_STEADY, true);
-            settingsForm.append(fAwake);
         }
         settingsForm.append(new StringItem(null, "\n" + credit()));
         settingsForm.addCommand(cSave);
@@ -289,7 +283,6 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                 if (docking != null) {
                     dockMode = fDock.getSelectedIndex();
                     dockDelay = seconds(fDockWait.getString(), 2);
-                    keepAwake = fAwake.getSelectedIndex();
                     shell.setDockWanted(dockMode != Docking.OFF);
                 }
                 if (phonePlays) player = phoneMac;
