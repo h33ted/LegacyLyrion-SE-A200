@@ -24,9 +24,6 @@ public final class Charger implements Runnable {
             for (int i = 0; all != null && i < all.length; i++) b.append(' ').append(all[i].getQuantity());
             app.log(all == null || all.length == 0 ? "Sensors: none reported" : b.toString());
 
-            peek(app, "battery_charge");
-            peek(app, "keylock");
-
             SensorInfo[] s = SensorManager.findSensors("charger_state", null);
             if (s == null || s.length == 0) {
                 app.log("Dock: no charger sensor; docking on sideways and still only");
@@ -47,37 +44,6 @@ public final class Charger implements Runnable {
             }
         } catch (Throwable t) {
             app.log("Dock: charger sensor unavailable (" + t + ")");
-        } finally {
-            try { if (c != null) c.close(); } catch (Throwable ignored) {}
-        }
-    }
-
-    /** Logs one reading of a sensor, channel by channel, to see what the phone reports. */
-    private static void peek(LegacyLyrion app, String quantity) {
-        SensorConnection c = null;
-        try {
-            SensorInfo[] s = SensorManager.findSensors(quantity, null);
-            if (s == null || s.length == 0) return;
-            c = (SensorConnection) Connector.open(s[0].getUrl());
-            Data[] d = c.getData(1);
-            StringBuffer b = new StringBuffer("Sensor " + quantity + ":");
-            for (int i = 0; d != null && i < d.length; i++) {
-                b.append(' ').append(d[i].getChannelInfo().getName()).append('=');
-                int type = d[i].getChannelInfo().getDataType();
-                if (type == ChannelInfo.TYPE_INT) {
-                    int[] v = d[i].getIntValues();
-                    b.append(v != null && v.length > 0 ? String.valueOf(v[v.length - 1]) : "?");
-                } else if (type == ChannelInfo.TYPE_DOUBLE) {
-                    double[] v = d[i].getDoubleValues();
-                    b.append(v != null && v.length > 0 ? String.valueOf(v[v.length - 1]) : "?");
-                } else {
-                    Object[] v = d[i].getObjectValues();
-                    b.append(v != null && v.length > 0 ? String.valueOf(v[v.length - 1]) : "?");
-                }
-            }
-            app.log(b.toString());
-        } catch (Throwable t) {
-            app.log("Sensor " + quantity + ": " + t);
         } finally {
             try { if (c != null) c.close(); } catch (Throwable ignored) {}
         }

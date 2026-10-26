@@ -159,7 +159,7 @@ Stand the Aino sideways, for example in its desk stand, and leave it still for a
 - **Not now:** doesn't ask again until you pick the phone up.
 - **Always when docked:** docks straight away from now on (change it back in [Settings](#settings)).
 
-Docked, the screen stays on and it shows a landscape Now Playing: large artwork, a big clock with the date, the track, and play/pause and skip buttons. The keys work as on Now Playing (left/right skip, up/down volume, centre play/pause), and *More* has Choose player, Shuffle and Repeat.
+Docked, the screen stays on and shows the artwork, a large white clock in the phone's own font with the date under it (like the standby screen), and the title and album. Touch the screen or press any key to bring up the play/pause and skip buttons and the soft keys for a few seconds. The keys work as on Now Playing (left/right skip, up/down volume, centre play/pause), and *More* has Choose player, Shuffle and Repeat.
 
 Docked mode ends after the same wait when you stand the phone upright, or with **Undock** (right soft key). Lying flat on a table doesn't count as docked.
 

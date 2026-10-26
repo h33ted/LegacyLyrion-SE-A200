@@ -17,7 +17,8 @@ of this repository:
   https://www.apache.org/licenses/LICENSE-2.0
 
 The files in stubs/ are minimal compile-time stand-ins for the JSR-256
-Mobile Sensor API and the Nokia UI API's DeviceControl class, written for this
+Mobile Sensor API, the Nokia UI API's DeviceControl class and the JSR-226 SVG
+API, written for this
 project from the public API signatures. They are never packaged; the phone
 provides the real implementations.
 

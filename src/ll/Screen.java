@@ -54,4 +54,9 @@ abstract class Screen {
     }
 
     void left() {}
+
+    /** True to hide the soft-key bar and the now-playing strip (the docked clock). */
+    boolean bare() {
+        return false;
+    }
 }

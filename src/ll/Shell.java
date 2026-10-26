@@ -296,12 +296,14 @@ final class Shell extends Canvas {
     }
 
     private int softH() {
+        Screen t = top();
+        if (t != null && menu == null && t.bare()) return 0;
         return Style.BIG.getHeight() + 8;
     }
 
     private boolean showMini() {
         Screen t = top();
-        return !(t instanceof NowPlayingScreen) && !(t instanceof HomeScreen) && app.npTitle != null;
+        return !(t instanceof NowPlayingScreen) && !(t instanceof HomeScreen) && app.npTitle != null && !(t != null && t.bare());
     }
 
     private int miniH() {
@@ -360,8 +362,16 @@ final class Shell extends Canvas {
             g.drawString(Style.fit(t, Style.SMALL, w - 34), 28, my + 4, Graphics.TOP | Graphics.LEFT);
         }
 
-        // soft-key bar: black, bold labels, the centre one larger
+        // soft-key bar: black, bold labels, the centre one larger (none on a bare screen)
         int sy = h - sh;
+        if (sh > 0) softKeys(g, s, w, sy, sh);
+
+        // pop-up menu
+        if (menu != null) paintMenu(g, w, sy);
+        toast(g, w, sy, mh);
+    }
+
+    private void softKeys(Graphics g, Screen s, int w, int sy, int sh) {
         g.setColor(0x000000);
         g.fillRect(0, sy, w, sh);
         g.setColor(0x262626);
@@ -390,11 +400,10 @@ final class Shell extends Canvas {
             g.setFont(Style.BIG);
             g.drawString(c, w / 2, sy + (sh - Style.BIG.getHeight()) / 2, Graphics.TOP | Graphics.HCENTER);
         }
+    }
 
-        // pop-up menu
-        if (menu != null) paintMenu(g, w, sy);
-
-        // message: full width, wrapped, so whole error messages are readable
+    /** Message: full width, wrapped, so whole error messages are readable. */
+    private void toast(Graphics g, int w, int sy, int mh) {
         if (toast != null && System.currentTimeMillis() < toastUntil) {
             g.setFont(Style.SMALL);
             java.util.Vector lines = Style.wrap(toast, Style.SMALL, w - 28);
@@ -459,6 +468,11 @@ final class Shell extends Canvas {
         if (s == null) return;
         boolean left = keyCode == SOFT_LEFT_SE || keyCode == SOFT_LEFT_ALT;
         boolean right = keyCode == SOFT_RIGHT_SE || keyCode == SOFT_RIGHT_ALT || keyCode == CLEAR_SE;
+        if ((left || right) && menu == null && s.bare()) {   // soft keys hidden: the first press just shows them
+            s.key(0, 0);
+            repaint();
+            return;
+        }
         if (menu == null) {                             // typing into a field goes first
             if (keyCode == CLEAR_SE && s.backspace()) { repaint(); return; }
             if (!left && !right && s.typed(keyCode, repeat)) { repaint(); return; }
