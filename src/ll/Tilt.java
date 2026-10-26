@@ -27,18 +27,19 @@ public final class Tilt implements Runnable {
             boolean logged = false;
             while (shell.tiltWanted()) {
                 Data[] d = c.getData(1);
-                double x = 0, y = 0;
+                double x = 0, y = 0, z = 0;
                 for (int i = 0; d != null && i < d.length; i++) {
                     String n = d[i].getChannelInfo().getName();
                     double v = first(d[i]);
                     if ("axis_x".equals(n)) x = v;
                     else if ("axis_y".equals(n)) y = v;
+                    else if ("axis_z".equals(n)) z = v;
                 }
                 if (!logged) {
-                    shell.app.log("Rotation: x=" + x + " y=" + y);
+                    shell.app.log("Rotation: x=" + x + " y=" + y + " z=" + z);
                     logged = true;
                 }
-                shell.tilt(x, y);
+                shell.tilt(x, y, z);
                 try { Thread.sleep(100); } catch (InterruptedException e) { break; }
             }
         } catch (Throwable t) {

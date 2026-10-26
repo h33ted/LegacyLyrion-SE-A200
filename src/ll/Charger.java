@@ -26,7 +26,7 @@ public final class Charger implements Runnable {
 
             SensorInfo[] s = SensorManager.findSensors("charger_state", null);
             if (s == null || s.length == 0) {
-                app.log("Dock: no charger sensor; use More > Docked mode");
+                app.log("Dock: no charger sensor; docking on sideways and still only");
                 return;
             }
             c = (SensorConnection) Connector.open(s[0].getUrl());

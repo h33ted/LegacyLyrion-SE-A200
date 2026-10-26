@@ -55,6 +55,9 @@ final class Shell extends Canvas {
     private static final int ROTATE_DELAY_MS = 300;
     private volatile int phys;             // which way the phone is held, even while the UI stays upright
     private volatile boolean dockWanted;   // docked mode needs the accelerometer even with rotation off
+    private double gX, gY;                 // last gravity reading, to notice movement
+    private volatile boolean flat;         // lying on its back: not "sideways", whatever it was before
+    private volatile long movedAt = System.currentTimeMillis();
 
     void setRotationMode(int mode) {
         rotMode = mode;
@@ -91,8 +94,12 @@ final class Shell extends Canvas {
     }
 
     /** Called by Tilt about ten times a second with the gravity reading. */
-    void tilt(double x, double y) {
+    void tilt(double x, double y, double z) {
         double ax = Math.abs(x), ay = Math.abs(y);
+        flat = Math.abs(z) > ax + ay;
+        if (Math.abs(x - gX) + Math.abs(y - gY) > (ax + ay) * 0.06 + 0.01) movedAt = System.currentTimeMillis();
+        gX = x;
+        gY = y;
         int o;
         if (ax > ay * 2) o = (x > 0) == (rotMode != ROT_REVERSED) ? 1 : 3;
         else if (ay > ax * 2) o = 0;
@@ -127,9 +134,14 @@ final class Shell extends Canvas {
         return rot == 0 ? getHeight() : getWidth();
     }
 
-    /** True while the phone is held sideways (or the firmware itself runs the app in landscape). */
+    /** How long the phone has lain still, from the accelerometer (docked mode). */
+    long stillFor() {
+        return System.currentTimeMillis() - movedAt;
+    }
+
+    /** True while the phone stands sideways (or the firmware itself runs the app in landscape). */
     boolean sideways() {
-        return phys != 0 || getWidth() > getHeight();
+        return (phys != 0 && !flat) || getWidth() > getHeight();
     }
 
     /** Docked mode turns the UI with the phone even when Settings says "Always upright". */
