@@ -45,7 +45,11 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     private Slim slim;
     int phoneMode = Slim.MODE_CHUNKED;
     int rotMode = Shell.ROT_AUTO;
-    private ChoiceGroup fRot;
+    int dockMode = Docking.ASK;
+    int dockDelay = 2;                  // seconds charging and sideways before docked mode
+    Docking docking;                    // only on the Aino
+    private ChoiceGroup fRot, fDock;
+    private TextField fDockWait;
     private final StringBuffer logBuf = new StringBuffer();
     private boolean started;
 
@@ -65,6 +69,11 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         shell = new Shell(this);
         load();
         shell.setRotationMode(rotMode);
+        if (Docking.supported(this)) {
+            docking = new Docking(this);
+            shell.setDockWanted(dockMode != Docking.OFF);
+            docking.start();
+        }
         if (lms.host.length() == 0) showSettings(true);
         else showHome();
         startMiniPoller();
@@ -111,6 +120,8 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                     source = f[7].charAt(0) - '0';
                     sourceSaved = true;
                 }
+                if (f.length > 8 && f[8].length() == 1) dockMode = f[8].charAt(0) - '0';
+                if (f.length > 9) dockDelay = seconds(f[9], dockDelay);
             }
             rs.closeRecordStore();
         } catch (Exception ignored) {}
@@ -128,13 +139,27 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     void save() {
         try {
             String v = lms.host + "\n" + lms.port + "\n" + player + "\n" + phoneMac + "\n" + (phonePlays ? "1" : "0")
-                    + "\n" + (phoneMode == Slim.MODE_DIRECT ? "1" : "0") + "\n" + rotMode + "\n" + (sourceSaved ? String.valueOf(source) : "");
+                    + "\n" + (phoneMode == Slim.MODE_DIRECT ? "1" : "0") + "\n" + rotMode + "\n" + (sourceSaved ? String.valueOf(source) : "")
+                    + "\n" + dockMode + "\n" + dockDelay;
             byte[] b = v.getBytes("UTF-8");
             RecordStore rs = RecordStore.openRecordStore("legacylyrion", true);
             if (rs.getNumRecords() == 0) rs.addRecord(b, 0, b.length);
             else rs.setRecord(1, b, 0, b.length);
             rs.closeRecordStore();
         } catch (Exception ignored) {}
+    }
+
+    /** Docked-mode wait from Settings or RMS: 0 to 120 seconds. */
+    private static int seconds(String s, int dflt) {
+        try {
+            return Math.max(0, Math.min(120, Integer.parseInt(s.trim())));
+        } catch (Exception e) {
+            return dflt;
+        }
+    }
+
+    boolean docked() {
+        return docking != null && docking.docked;
     }
 
     private static String[] split(String s) {
@@ -199,6 +224,14 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                 new String[]{"Turn with the phone", "Turn with the phone (other way)", "Always upright"}, null);
         fRot.setSelectedIndex(rotMode >= 0 && rotMode <= 2 ? rotMode : 0, true);
         settingsForm.append(fRot);
+        if (docking != null) {
+            fDock = new ChoiceGroup("Docked (charging, lying sideways)", Choice.EXCLUSIVE,
+                    new String[]{"Ask", "Always", "Off"}, null);
+            fDock.setSelectedIndex(dockMode >= 0 && dockMode <= 2 ? dockMode : Docking.ASK, true);
+            fDockWait = new TextField("Wait before docking (seconds)", String.valueOf(dockDelay), 3, TextField.NUMERIC);
+            settingsForm.append(fDock);
+            settingsForm.append(fDockWait);
+        }
         settingsForm.append(new StringItem(null, "\n" + credit()));
         settingsForm.addCommand(cSave);
         settingsForm.addCommand(cLog);
@@ -247,6 +280,11 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                 phoneMode = fMode.getSelectedIndex() == 1 ? Slim.MODE_DIRECT : Slim.MODE_CHUNKED;
                 rotMode = fRot.getSelectedIndex();
                 shell.setRotationMode(rotMode);
+                if (docking != null) {
+                    dockMode = fDock.getSelectedIndex();
+                    dockDelay = seconds(fDockWait.getString(), 2);
+                    shell.setDockWanted(dockMode != Docking.OFF);
+                }
                 if (phonePlays) player = phoneMac;
                 save();
                 appTop = null;
@@ -563,7 +601,8 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         if (r != null && r.item != null && r.action == A_ITEM && (r.item.isTrack() || "playlist".equals(r.item.type))) {
             return new String[]{"Play now", "Play next", "Add to queue", "Now playing"};
         }
-        return new String[]{"Now playing", "Players", "Settings", "Diagnostics"};
+        return docking != null ? new String[]{"Now playing", "Docked mode", "Players", "Settings", "Diagnostics"}
+                : new String[]{"Now playing", "Players", "Settings", "Diagnostics"};
     }
 
     void option(ListScreen s, ListScreen.Row r, int i) {
@@ -571,6 +610,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         String what = o[i];
         if (what.equals("Now playing")) openNowPlaying();
         else if (what.equals("Players")) openPlayers();
+        else if (what.equals("Docked mode")) docking.dockNow();
         else if (what.equals("Settings")) showSettings(false);
         else if (what.equals("Diagnostics")) showLog();
         else {

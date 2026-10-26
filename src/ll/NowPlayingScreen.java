@@ -11,14 +11,15 @@ import javax.microedition.lcdui.Image;
  * Walkman-style Now Playing: artwork, title, progress, round transport buttons, volume.
  * Keys: left/right (4/6) skip, centre (5) play/pause, up/down (2/8) volume.
  */
-final class NowPlayingScreen extends Screen implements Runnable {
-    private String track = "", artist = "", album = "", artKey = "";
-    private boolean playing;
-    private int time, dur, vol;
-    private Image cover;
+class NowPlayingScreen extends Screen implements Runnable {
+    String track = "", artist = "", album = "";
+    private String artKey = "";
+    boolean playing;
+    int time, dur, vol;
+    Image cover;
     private volatile boolean running;
-    private int bx, by, br; // transport layout for taps
-    private int volY;
+    int bx, by, br; // transport layout for taps
+    int volY;
 
     NowPlayingScreen(LegacyLyrion app) {
         super(app, "Now playing");
@@ -103,7 +104,7 @@ final class NowPlayingScreen extends Screen implements Runnable {
         app.shell.repaint();
     }
 
-    private int coverSize() {
+    int coverSize() {
         int w = Math.min(app.shell.lw(), app.shell.lh());   // same artwork size either way up
         int tall = Math.max(app.shell.lw(), app.shell.lh()) - 34;   // content height upright
         // leave room for the title, progress, buttons and volume under it (240x320 phones)
@@ -184,13 +185,13 @@ final class NowPlayingScreen extends Screen implements Runnable {
     }
 
     /** Transport button: dark glass disc with a thin grey ring, white symbol (larger for play). */
-    private void circle(Graphics g, int x, int y, int r, int glyph, boolean main) {
+    void circle(Graphics g, int x, int y, int r, int glyph, boolean main) {
         Style.glyph(g, Style.G_DOT, x, y, 2 * r, main ? 0x2c2c2c : 0x161616);
         Style.glyph(g, Style.G_RING, x, y, 2 * r, main ? 0xa0a0a0 : 0x5a5a5a);
         Style.glyph(g, glyph, x, y, main ? r * 4 / 5 : r * 3 / 4, main ? Style.TEXT : 0xd0d0d0);
     }
 
-    private static String clock(int s) {
+    static String clock(int s) {
         int sec = s % 60;
         return (s / 60) + ":" + (sec < 10 ? "0" : "") + sec;
     }
@@ -221,7 +222,9 @@ final class NowPlayingScreen extends Screen implements Runnable {
     }
 
     String[] options() {
-        return new String[]{"Shuffle on/off", "Repeat: off/all/one", "Choose player", "Clear queue"};
+        return app.docking != null
+                ? new String[]{"Shuffle on/off", "Repeat: off/all/one", "Choose player", "Clear queue", "Docked mode"}
+                : new String[]{"Shuffle on/off", "Repeat: off/all/one", "Choose player", "Clear queue"};
     }
 
     void option(int i) {
@@ -229,9 +232,10 @@ final class NowPlayingScreen extends Screen implements Runnable {
         else if (i == 1) send(new String[]{"playlist", "repeat"});
         else if (i == 2) app.openPlayers();
         else if (i == 3) send(new String[]{"playlist", "clear"});
+        else if (i == 4 && app.docking != null) app.docking.dockNow();
     }
 
-    private void send(final String[] cmd) {
+    void send(final String[] cmd) {
         new Thread(new Runnable() {
             public void run() {
                 try {

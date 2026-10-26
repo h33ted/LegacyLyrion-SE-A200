@@ -3,7 +3,7 @@ rem Windows version of build.sh: builds dist\LegacyLyrion-Aino.jar and LegacyLyr
 rem Needs JDK 11 or newer on PATH; the jars in lib\ are downloaded on the first build (curl ships with Windows 10+).
 setlocal
 cd /d "%~dp0"
-if "%VER%"=="" set VER=0.6.1
+if "%VER%"=="" set VER=0.7.0
 if not exist lib mkdir lib
 set M2=https://repo1.maven.org/maven2
 if not exist lib\ecj-4.6.1.jar curl.exe -fsSL -o lib\ecj-4.6.1.jar %M2%/org/eclipse/jdt/core/compiler/ecj/4.6.1/ecj-4.6.1.jar || exit /b 1

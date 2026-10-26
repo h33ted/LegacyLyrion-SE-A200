@@ -6,7 +6,7 @@ This guide sets up three things:
 2. **[Spotty](https://github.com/michaelherger/Spotty-Plugin)**, the plugin that brings Spotify into Lyrion, and optionally **[YouTube Music for LMS](https://github.com/schmij97/lms-ytmusic)**.
 3. **LegacyLyrion A200** on a Sony Ericsson Aino, W995, C905, W705 or another A200-platform phone, which becomes a Spotify-style remote and a player in its own right.
 
-**Contents:** [What you need](#what-you-need) · [1. Lyrion](#1-install-lyrion-music-server) · [2. Spotty](#2-add-spotify-with-the-spotty-plugin) · [YouTube Music](#optional-youtube-music) · [3. MP3](#3-make-sure-lyrion-can-stream-mp3) · [4. Install the app](#4-install-the-app-on-the-phone) · [5. First start](#5-first-start) · [6. Play on the phone](#6-play-on-the-phone-itself) · [Controls](#controls) · [Settings](#settings) · [Troubleshooting](#troubleshooting)
+**Contents:** [What you need](#what-you-need) · [1. Lyrion](#1-install-lyrion-music-server) · [2. Spotty](#2-add-spotify-with-the-spotty-plugin) · [YouTube Music](#optional-youtube-music) · [3. MP3](#3-make-sure-lyrion-can-stream-mp3) · [4. Install the app](#4-install-the-app-on-the-phone) · [5. First start](#5-first-start) · [6. Play on the phone](#6-play-on-the-phone-itself) · [Docked mode](#docked-mode-aino) · [Controls](#controls) · [Settings](#settings) · [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -151,6 +151,22 @@ Also in Settings, under **Phone playback**:
 
 ---
 
+## Docked mode (Aino)
+
+Put the Aino on its charger lying sideways, for example in its desk stand, and leave it for a moment (2 seconds by default). The app asks **Docked?**:
+
+- **Yes, keep the screen on:** docks now, and docks again without asking until you unplug the charger.
+- **Not now:** doesn't ask again until you unplug the charger.
+- **Always when docked:** docks straight away from now on (change it back in [Settings](#settings)).
+
+Docked, the screen stays on and shows a landscape Now Playing: large artwork, a big clock with the date, the track, and play/pause and skip buttons. The keys work as on Now Playing (left/right skip, up/down volume, centre play/pause), and *More* has Choose player, Shuffle and Repeat.
+
+Docked mode ends at once when you unplug the charger, after the same wait when you stand the phone upright, or with **Undock** (right soft key).
+
+You can also dock by hand from **More → Docked mode** on any list or on Now Playing; that lasts until you press *Undock*. The screen only stays on while LegacyLyrion is in front: after *Hide*, the phone sleeps as usual.
+
+Docked mode needs the Aino to report its charger to Java apps. The [Diagnostics log](#diagnostics-log) lists the sensors the phone offers (a line starting `Sensors:`); without `charger_state`, use *More → Docked mode* instead.
+
 ## Controls
 
 | | Keypad | Touch (Aino) |
@@ -181,6 +197,8 @@ Each source's home menu has **Resume**, **Search**, its own menus with artwork p
 | Server IP, Port | Your Lyrion server, usually port `9000` |
 | Play on this phone | Makes the phone a Lyrion player ([details](#6-play-on-the-phone-itself)) |
 | Phone playback | [Chunked or Direct stream](#playback-modes) |
+| Docked (Aino) | [*Ask*, *Always* or *Off*](#docked-mode-aino) when the phone is charging and lying sideways |
+| Wait before docking (Aino) | How long it has to charge sideways before docked mode starts, in seconds (default `2`) |
 | Screen rotation | *Turn with the phone*, *Turn with the phone (other way)* for phones whose sensor is mounted the other way round, or *Always upright* |
 | Diagnostics | The [log](#diagnostics-log) |
 
@@ -200,6 +218,8 @@ Each source's home menu has **Resume**, **Search**, its own menus with artwork p
 | Playback stutters | Set *Bitrate Limiting* to 128 kbps for the phone's player ([tip](#playback-modes)), and keep the phone close to the router. |
 | "Response empty" errors | Fixed in 0.6.1, where every request opens its own connection. Update the app. |
 | The installer refuses the file | Copy the `.jad` and `.jar` into the same folder and open the `.jad`, not the `.jar`. Make sure you took the files from a release, not a source download. |
+| Docked mode never asks (Aino) | Check that *Settings → Docked* isn't *Off*, then look for `charger_state` on the `Sensors:` line in the [Diagnostics log](#diagnostics-log). If it's missing, use *More → Docked mode*. |
+| The screen still turns off when docked | Some firmware ignores Java's backlight requests; the Diagnostics log says `Dock: keep-awake not supported` then. Raise the phone's own backlight timeout instead. |
 | The screen turns the wrong way | *Settings → Screen rotation → Turn with the phone (other way)*, or *Always upright*. |
 | Windows server: phones can't connect or stay silent | See below. |
 

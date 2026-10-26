@@ -53,13 +53,22 @@ final class Shell extends Canvas {
     private Image frame;
     private boolean tiltRunning;
     private static final int ROTATE_DELAY_MS = 300;
+    private volatile int phys;             // which way the phone is held, even while the UI stays upright
+    private volatile boolean dockWanted;   // docked mode needs the accelerometer even with rotation off
 
     void setRotationMode(int mode) {
         rotMode = mode;
-        if (mode == ROT_OFF) {
-            setRot(0);
-            return;
-        }
+        if (mode == ROT_OFF && !app.docked()) setRot(0);
+        if (mode != ROT_OFF || dockWanted) startTilt();
+    }
+
+    /** Docked mode (Aino) watches which way the phone lies even when rotation is off. */
+    void setDockWanted(boolean on) {
+        dockWanted = on;
+        if (on) startTilt();
+    }
+
+    private void startTilt() {
         if (tiltRunning) return;
         try {
             Runnable r = (Runnable) Class.forName("ll.Tilt").newInstance();
@@ -76,8 +85,9 @@ final class Shell extends Canvas {
     }
 
     boolean tiltWanted() {
-        if (rotMode == ROT_OFF) tiltRunning = false;
-        return rotMode != ROT_OFF;
+        boolean want = rotMode != ROT_OFF || dockWanted;
+        if (!want) tiltRunning = false;
+        return want;
     }
 
     /** Called by Tilt about ten times a second with the gravity reading. */
@@ -93,7 +103,9 @@ final class Shell extends Canvas {
             pendingSince = now;
             return;
         }
-        if (o != rot && now - pendingSince >= ROTATE_DELAY_MS) setRot(o);
+        if (now - pendingSince < ROTATE_DELAY_MS) return;
+        phys = o;
+        if (o != rot && (rotMode != ROT_OFF || app.docked())) setRot(o);
     }
 
     private void setRot(int r) {
@@ -101,7 +113,7 @@ final class Shell extends Canvas {
         if (r == rot) return;
         rot = r;
         frame = null;
-        menu = null;
+        if (chooser == null) menu = null;       // a prompt stays up through a turn
         dragging = false;
         repaint();
     }
@@ -113,6 +125,20 @@ final class Shell extends Canvas {
 
     int lh() {
         return rot == 0 ? getHeight() : getWidth();
+    }
+
+    /** True while the phone is held sideways (or the firmware itself runs the app in landscape). */
+    boolean sideways() {
+        return phys != 0 || getWidth() > getHeight();
+    }
+
+    /** Docked mode turns the UI with the phone even when Settings says "Always upright". */
+    void dockRotation(boolean on) {
+        if (on) {
+            if (phys != rot) setRot(phys);
+        } else if (rotMode == ROT_OFF) {
+            setRot(0);
+        }
     }
 
     private int ux(int x, int y) {
@@ -164,13 +190,13 @@ final class Shell extends Canvas {
         Screen t = top();
         if (t != null) t.hidden();
         stack.addElement(s);
-        menu = null;
+        dismissMenu();
         s.shown();
         repaint();
     }
 
     void back() {
-        menu = null;
+        dismissMenu();
         if (stack.size() <= 1) {
             app.exit();
             return;
@@ -180,6 +206,60 @@ final class Shell extends Canvas {
         stack.removeElementAt(stack.size() - 1);
         top().shown();
         repaint();
+    }
+
+    boolean holds(Screen s) {
+        return stack.contains(s);
+    }
+
+    /** Takes a screen out of the stack wherever it is (docked mode ending under another screen). */
+    void remove(Screen s) {
+        if (!stack.contains(s) || stack.size() <= 1) return;
+        boolean wasTop = top() == s;
+        if (wasTop) {
+            dismissMenu();
+            s.hidden();
+        }
+        stack.removeElement(s);
+        if (wasTop) top().shown();
+        repaint();
+    }
+
+    // ------------------------------------------------------------------ prompts
+
+    /** Answer to prompt(): the chosen row, or -1 when dismissed. */
+    interface Chooser {
+        void chose(int k);
+    }
+
+    private Chooser chooser;
+    private String menuTitle = "Options";
+
+    /** A question drawn like the More menu, e.g. "Docked?". */
+    void prompt(String title, String[] items, Chooser c) {
+        dismissMenu();
+        menu = items;
+        menuFocus = 0;
+        menuTitle = title;
+        chooser = c;
+        repaint();
+    }
+
+    /** Closes an open prompt without answering it. */
+    void closePrompt() {
+        if (chooser == null) return;
+        chooser = null;
+        menu = null;
+        menuTitle = "Options";
+        repaint();
+    }
+
+    private void dismissMenu() {
+        Chooser c = chooser;
+        chooser = null;
+        menuTitle = "Options";
+        menu = null;
+        if (c != null) c.chose(-1);
     }
 
     void toast(String msg) {
@@ -331,7 +411,7 @@ final class Shell extends Canvas {
         Style.panel(g, menuX, menuY, menuW, mh);
         g.setFont(Style.TITLE);
         g.setColor(Style.TEXT);
-        g.drawString("Options", menuX + 10, menuY + 6, Graphics.TOP | Graphics.LEFT);
+        g.drawString(menuTitle, menuX + 10, menuY + 6, Graphics.TOP | Graphics.LEFT);
         g.setFont(Style.ROW);
         for (int k = 0; k < menu.length; k++) {
             int y = menuTop + k * menuRowH;
@@ -380,7 +460,7 @@ final class Shell extends Canvas {
             if (g == UP || keyCode == KEY_NUM2) menuFocus = (menuFocus - 1 + menu.length) % menu.length;
             else if (g == DOWN || keyCode == KEY_NUM8) menuFocus = (menuFocus + 1) % menu.length;
             else if (fire || left) chooseMenu(menuFocus);
-            else if (right) menu = null;
+            else if (right) dismissMenu();
             repaint();
             return;
         }
@@ -400,15 +480,21 @@ final class Shell extends Canvas {
     private void openMenu(Screen s) {
         String[] o = s.options();
         if (o == null || o.length == 0) return;
+        chooser = null;
+        menuTitle = "Options";
         menu = o;
         menuFocus = 0;
     }
 
     private void chooseMenu(int k) {
         Screen s = top();
+        Chooser c = chooser;
+        chooser = null;
+        menuTitle = "Options";
         menu = null;
         repaint();
-        if (s != null) s.option(k);
+        if (c != null) c.chose(k);
+        else if (s != null) s.option(k);
     }
 
     // ------------------------------------------------------------------ touch
@@ -458,12 +544,12 @@ final class Shell extends Canvas {
                     return;
                 }
             } else if (y >= h - sh && x > w * 2 / 3) {
-                menu = null;
+                dismissMenu();
             } else if (y >= h - sh && x > w / 3) {
                 chooseMenu(menuFocus);
                 return;
             } else {
-                menu = null;
+                dismissMenu();
             }
             repaint();
             return;
