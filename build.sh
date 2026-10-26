@@ -10,7 +10,7 @@
 # so no separate preverify step is required.
 set -e
 cd "$(dirname "$0")"
-VER=${VER:-0.7.2}
+VER=${VER:-0.7.3}
 # Test builds: LL_SERVER=192.168.1.20:9000 sh build.sh  -> dist-test/ with the server preset
 OUT=dist
 M2=https://repo1.maven.org/maven2
@@ -23,10 +23,10 @@ for J in org/eclipse/jdt/core/compiler/ecj/4.6.1/ecj-4.6.1.jar \
 done
 if [ -n "$LL_SERVER" ]; then OUT=dist-test; fi
 rm -rf build $OUT && mkdir -p build/classes build/stubs $OUT
-# Compile-time stubs for APIs the phone provides (JSR-256 sensors); never packaged.
+# Compile-time stubs for APIs the phone provides (JSR-256 sensors, Nokia UI DeviceControl); never packaged.
 java -jar lib/ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn \
   -bootclasspath lib/cldcapi11-2.0.4.jar:lib/midpapi20-2.0.4.jar \
-  -d build/stubs stubs/javax/microedition/sensor/*.java
+  -d build/stubs stubs/javax/microedition/sensor/*.java stubs/com/nokia/mid/ui/*.java
 java -jar lib/ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn \
   -bootclasspath lib/cldcapi11-2.0.4.jar:lib/midpapi20-2.0.4.jar:build/stubs \
   -d build/classes src/ll/*.java

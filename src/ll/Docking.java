@@ -4,9 +4,9 @@ package ll;
  * Docked mode (Aino): when the phone lies sideways and still for a while (the wait is set in
  * Settings, 2 s by default), as it does in its desk stand, the app asks "Docked?" or, if the
  * answer was "Always", docks straight away. Phones that report the charger to Java must also be
- * charging. Docked, it shows the landscape DockScreen. It does not hold the backlight: the only
- * MIDP call for that, Display.flashBacklight, blinks the screen on Sony Ericsson phones, so the
- * light follows the phone's own setting. Standing the phone upright undocks after the same wait; unplugging (where the charger
+ * charging. Docked, it shows the landscape DockScreen and keeps the display lit through the Nokia
+ * UI API (NokiaLight), which the Aino carries. MIDP's own Display.flashBacklight is not used: on
+ * Sony Ericsson phones it blinks the screen. Standing the phone upright undocks after the same wait; unplugging (where the charger
  * is reported) undocks at once.
  *
  * Also usable by hand from More > Docked mode; a manual dock lasts until Undock.
@@ -24,6 +24,9 @@ final class Docking implements Runnable {
     private boolean asking;
     private long upSince = -1;
     private DockScreen screen;
+    private Runnable light;          // NokiaLight, if the phone has DeviceControl
+    private long litAt;
+    private boolean litLogged;
 
     Docking(LegacyLyrion app) {
         this.app = app;
@@ -39,11 +42,12 @@ final class Docking implements Runnable {
 
     void start() {
         probe();
-        try {                                    // Nokia UI API: some non-Nokia phones carry it for compatibility
+        try {                                    // Nokia UI API: the Aino carries it; steady light, no blinking
             Class.forName("com.nokia.mid.ui.DeviceControl");
+            light = (Runnable) Class.forName("ll.NokiaLight").newInstance();
             app.log("Dock: Nokia DeviceControl present");
         } catch (Throwable t) {
-            app.log("Dock: no Nokia DeviceControl");
+            app.log("Dock: no Nokia DeviceControl; the light follows the phone's setting");
         }
         try {
             Runnable r = (Runnable) Class.forName("ll.Charger").newInstance();
@@ -94,9 +98,28 @@ final class Docking implements Runnable {
             try { Thread.sleep(250); } catch (InterruptedException e) {}
             try {
                 tick();
+                keepLit();
             } catch (Throwable t) {
                 app.log("Dock: " + t);
             }
+        }
+    }
+
+    /** Docked and in front: renews the backlight every few seconds. Undocked, it lapses by itself. */
+    private void keepLit() {
+        if (light == null || !docked || !app.keepLit || !app.shell.isShown()) return;
+        long now = System.currentTimeMillis();
+        if (now - litAt < 4000) return;
+        litAt = now;
+        try {
+            light.run();
+            if (!litLogged) {
+                app.log("Dock: keeping the screen on");
+                litLogged = true;
+            }
+        } catch (Throwable t) {
+            app.log("Dock: DeviceControl failed (" + t + ")");
+            light = null;
         }
     }
 
@@ -171,6 +194,7 @@ final class Docking implements Runnable {
     private void enter(final boolean byHand) {
         docked = true;
         manual = byHand;
+        litAt = 0;
         upSince = -1;
         app.log("Dock: docked" + (byHand ? " (by hand)" : ""));
         app.display.callSerially(new Runnable() {

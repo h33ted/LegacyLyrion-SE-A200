@@ -3,7 +3,7 @@ rem Windows version of build.sh: builds dist\LegacyLyrion-Aino.jar and LegacyLyr
 rem Needs JDK 11 or newer on PATH; the jars in lib\ are downloaded on the first build (curl ships with Windows 10+).
 setlocal
 cd /d "%~dp0"
-if "%VER%"=="" set VER=0.7.2
+if "%VER%"=="" set VER=0.7.3
 if not exist lib mkdir lib
 set M2=https://repo1.maven.org/maven2
 if not exist lib\ecj-4.6.1.jar curl.exe -fsSL -o lib\ecj-4.6.1.jar %M2%/org/eclipse/jdt/core/compiler/ecj/4.6.1/ecj-4.6.1.jar || exit /b 1
@@ -12,8 +12,8 @@ if not exist lib\midpapi20-2.0.4.jar curl.exe -fsSL -o lib\midpapi20-2.0.4.jar %
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 mkdir build\classes build\stubs dist
-rem Compile-time stubs for APIs the phone provides (JSR-256 sensors); never packaged.
-java -jar lib\ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn -bootclasspath lib\cldcapi11-2.0.4.jar;lib\midpapi20-2.0.4.jar -d build\stubs stubs\javax\microedition\sensor\*.java || exit /b 1
+rem Compile-time stubs for APIs the phone provides (JSR-256 sensors, Nokia UI DeviceControl); never packaged.
+java -jar lib\ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn -bootclasspath lib\cldcapi11-2.0.4.jar;lib\midpapi20-2.0.4.jar -d build\stubs stubs\javax\microedition\sensor\*.java stubs\com\nokia\mid\ui\*.java || exit /b 1
 java -jar lib\ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn -bootclasspath lib\cldcapi11-2.0.4.jar;lib\midpapi20-2.0.4.jar;build\stubs -d build\classes src\ll\*.java || exit /b 1
 copy /y res\icon.png build\classes\icon.png >nul
 (
