@@ -100,7 +100,7 @@ final class DockScreen extends NowPlayingScreen {
         String clock = hh + ":" + (mm < 10 ? "0" : "") + mm;
         if (b != null) {
             try {
-                drawClock(g, b, clock, right, y - px / 5, px, w, h, n);   // the SVG box has room above the digits
+                drawClock(g, b, clock, left, right, y - px / 5, px, w, h, n);   // the SVG box has room above the digits
             } catch (Throwable t) {
                 app.log("Dock clock: SVG failed (" + t + ")");
                 big = null;
@@ -212,7 +212,7 @@ final class DockScreen extends NowPlayingScreen {
     }
 
     /** The clock from a cached image: SVG is rendered only when the minute or the layout changes. */
-    private void drawClock(Graphics g, BigText b, String text, int right, int y0, int px, int w, int h, boolean n) throws Exception {
+    private void drawClock(Graphics g, BigText b, String text, int left, int right, int y0, int px, int w, int h, boolean n) throws Exception {
         int iw = px * 3, ih = px * 6 / 5, x0 = right - iw;
         String k = text + "/" + px + "/" + right + "/" + y0 + "/" + w + "x" + h + (n ? "/n" : "");
         if (!k.equals(clockKey)) {
@@ -236,7 +236,9 @@ final class DockScreen extends NowPlayingScreen {
             clockImg = img;
             clockKey = k;
         }
+        g.clipRect(left - 4, y0, right - left + 4, ih);   // the image is wider than the clock: keep it off the artwork
         g.drawImage(clockImg, x0, y0, Graphics.TOP | Graphics.LEFT);
+        g.setClip(0, 0, w, h);
     }
 
     /**
