@@ -49,9 +49,10 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     int dockDelay = 2;                  // seconds sideways and still before docked mode
     boolean keepLit = true;             // docked: keep the screen on (Nokia DeviceControl)
     int nightMode = Docking.ASK;        // docked between 23:00 and 07:00: ask, always, or never
+    int sunriseMinutes = 10;            // docked: the screen brightens over this long before a Lyrion alarm
     Docking docking;                    // only on the Aino
     private ChoiceGroup fRot, fDock, fLit, fNight;
-    private TextField fDockWait;
+    private TextField fDockWait, fSunrise;
     private final StringBuffer logBuf = new StringBuffer();
     private boolean started;
 
@@ -126,6 +127,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                 if (f.length > 9) dockDelay = seconds(f[9], dockDelay);
                 if (f.length > 10) keepLit = !"0".equals(f[10]);
                 if (f.length > 11 && f[11].length() == 1) nightMode = f[11].charAt(0) - '0';
+                if (f.length > 12) sunriseMinutes = minutes(f[12], sunriseMinutes);
             }
             rs.closeRecordStore();
         } catch (Exception ignored) {}
@@ -144,7 +146,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         try {
             String v = lms.host + "\n" + lms.port + "\n" + player + "\n" + phoneMac + "\n" + (phonePlays ? "1" : "0")
                     + "\n" + (phoneMode == Slim.MODE_DIRECT ? "1" : "0") + "\n" + rotMode + "\n" + (sourceSaved ? String.valueOf(source) : "")
-                    + "\n" + dockMode + "\n" + dockDelay + "\n" + (keepLit ? "1" : "0") + "\n" + nightMode;
+                    + "\n" + dockMode + "\n" + dockDelay + "\n" + (keepLit ? "1" : "0") + "\n" + nightMode + "\n" + sunriseMinutes;
             byte[] b = v.getBytes("UTF-8");
             RecordStore rs = RecordStore.openRecordStore("legacylyrion", true);
             if (rs.getNumRecords() == 0) rs.addRecord(b, 0, b.length);
@@ -157,6 +159,15 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     private static int seconds(String s, int dflt) {
         try {
             return Math.max(0, Math.min(120, Integer.parseInt(s.trim())));
+        } catch (Exception e) {
+            return dflt;
+        }
+    }
+
+    /** Sunrise length from Settings or RMS: 0 to 60 minutes. */
+    private static int minutes(String s, int dflt) {
+        try {
+            return Math.max(0, Math.min(60, Integer.parseInt(s.trim())));
         } catch (Exception e) {
             return dflt;
         }
@@ -242,6 +253,8 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                     new String[]{"Ask", "Always", "Never"}, null);
             fNight.setSelectedIndex(nightMode >= 0 && nightMode <= 2 ? nightMode : Docking.ASK, true);
             settingsForm.append(fNight);
+            fSunrise = new TextField("Sunrise before alarms (minutes, 0 = off)", String.valueOf(sunriseMinutes), 2, TextField.NUMERIC);
+            settingsForm.append(fSunrise);
         }
         settingsForm.append(new StringItem(null, "\n" + credit()));
         settingsForm.addCommand(cSave);
@@ -296,6 +309,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                     dockDelay = seconds(fDockWait.getString(), 2);
                     keepLit = fLit.isSelected(0);
                     nightMode = fNight.getSelectedIndex();
+                    sunriseMinutes = minutes(fSunrise.getString(), 10);
                     shell.setDockWanted(dockMode != Docking.OFF);
                 }
                 if (phonePlays) player = phoneMac;

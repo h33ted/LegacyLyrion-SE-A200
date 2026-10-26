@@ -165,6 +165,8 @@ Docked mode ends after the same wait when you stand the phone upright, or with *
 
 **Night mode:** docked between 23:00 and 07:00, the app asks **Night mode?** (*Yes*, *Not tonight*, *Always at night*). Night mode turns the background black, tints everything red, the artwork included, and turns the backlight right down; it switches itself off at 07:00. Switch it by hand with *More → Night mode* / *Day mode* on the docked screen, and choose *Ask*, *Always* or *Never* in [Settings](#settings).
 
+**Sunrise alarm:** docked, the screen shows the next alarm of the player you control, as set in Lyrion (*Settings → Player → Alarm* in the Lyrion web page), next to the date. Ten minutes before it (*Settings → Sunrise before alarms*, `0` turns it off) the screen starts at its dimmest and brightens slowly to full, night mode or not; at the alarm, night mode ends and Lyrion starts the music as usual. The fades between brightness levels, and the keypad light going off in night mode, use the same Nokia `DeviceControl`.
+
 You can also dock by hand from **More → Docked mode** on any list or on Now Playing; that lasts until you press *Undock*.
 
 The Aino doesn't tell Java apps whether it is charging, so docked mode goes by position alone: sideways and still. On phones that do report the charger (`charger_state` on the `Sensors:` line in the [Diagnostics log](#diagnostics-log)), it also has to be charging, and unplugging undocks at once.
@@ -205,6 +207,7 @@ Each source's home menu has **Resume**, **Search**, its own menus with artwork p
 | Wait before docking (Aino) | How long it has to stand still sideways before docked mode starts, in seconds (default `2`) |
 | Keep the screen on when docked (Aino) | On by default ([how](#docked-mode-aino)) |
 | Night mode when docked (Aino) | [*Ask*, *Always* or *Never*](#docked-mode-aino) between 23:00 and 07:00 |
+| Sunrise before alarms (Aino) | Minutes the screen brightens before a Lyrion alarm, `0` for off (default `10`) ([how](#docked-mode-aino)) |
 | Screen rotation | *Turn with the phone*, *Turn with the phone (other way)* for phones whose sensor is mounted the other way round, or *Always upright* |
 | Diagnostics | The [log](#diagnostics-log) |
 

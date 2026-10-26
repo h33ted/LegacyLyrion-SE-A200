@@ -8,7 +8,7 @@ import com.nokia.mid.ui.DeviceControl;
  * name and renews it every few seconds while docked, so phones without the API still run the app.
  */
 public final class NokiaLight implements Docking.Light {
-    public void level(int percent) {
-        DeviceControl.setLights(0, percent);
+    public void set(int num, int percent) {
+        DeviceControl.setLights(num, percent);
     }
 }

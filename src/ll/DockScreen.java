@@ -118,6 +118,14 @@ final class DockScreen extends NowPlayingScreen {
         int day = c.get(Calendar.DAY_OF_MONTH), mon = c.get(Calendar.MONTH) + 1;
         g.drawString((day < 10 ? "0" : "") + day + "." + (mon < 10 ? "0" : "") + mon + "." + c.get(Calendar.YEAR),
                 right, y, Graphics.TOP | Graphics.RIGHT);
+        long alarm = app.docking != null ? app.docking.nextAlarm : 0;
+        if (alarm > 0 && alarm - System.currentTimeMillis() < 86400000L) {   // next Lyrion alarm, left of the date
+            int dh = DATE.getHeight(), ac = n ? N_SUB : Style.TEXT_DIM;
+            Style.glyph(g, Style.G_CLOCK, left + dh / 2, y + dh / 2, dh - 4, ac);
+            g.setFont(Style.SMALL);
+            g.setColor(ac);
+            g.drawString(Docking.clock(alarm), left + dh + 2, y + (dh - Style.SMALL.getHeight()) / 2, Graphics.TOP | Graphics.LEFT);
+        }
         y += DATE.getHeight() + 14;
 
         // title and album, scrolling when they don't fit
@@ -285,7 +293,9 @@ final class DockScreen extends NowPlayingScreen {
     void tap(int x, int y, int w, int h) {
         boolean was = controls();
         reveal();
-        if (was) super.tap(x, y, w, h);              // the first touch only shows the buttons
+        if (!was) return;                               // the first touch only shows the buttons
+        if (br > 0 && Math.abs(y - by) <= br + 6) app.display.vibrate(30);   // a tick on the buttons
+        super.tap(x, y, w, h);
     }
 
     void key(int game, int keyCode) {

@@ -19,7 +19,8 @@ final class Docking implements Runnable {
 
     /** Backlight control (NokiaLight), loaded by name. */
     interface Light {
-        void level(int percent);
+        /** Light num (0 display, 1 keypad on most phones) at 0..100 percent. */
+        void set(int num, int percent);
     }
 
     private final LegacyLyrion app;
@@ -33,7 +34,10 @@ final class Docking implements Runnable {
     private DockScreen screen;
     private Light light;             // NokiaLight, if the phone has DeviceControl
     private long litAt;
-    private int litLevel = -1;
+    private int litLevel = -1, keypadLevel = -1;
+    volatile long nextAlarm;         // the controlled player's next Lyrion alarm, ms since 1970; 0 if none
+    private volatile long alarmsAt;  // when the alarms were last read
+    private boolean woke;            // the alarm went off: no night mode until 07:00
     volatile boolean night;          // red-on-black, dimmed (DockScreen reads it)
     private boolean nightByHand;     // switched from the menu: stays until switched back or undocked
     private int nightAnswer;         // tonight's answer to "Night mode?": 0 not asked, 1 yes, 2 no
@@ -56,7 +60,7 @@ final class Docking implements Runnable {
         try {                                    // Nokia UI API: the Aino carries it; steady light, no blinking
             Class.forName("com.nokia.mid.ui.DeviceControl");
             light = (Light) Class.forName("ll.NokiaLight").newInstance();
-            app.log("Dock: Nokia DeviceControl present");
+            app.log("Dock: Nokia DeviceControl present" + nokiaExtras());
         } catch (Throwable t) {
             app.log("Dock: no Nokia DeviceControl; the light follows the phone's setting");
         }
@@ -67,6 +71,7 @@ final class Docking implements Runnable {
             app.log("Dock: this phone has no sensor API (" + t + ")");
         }
         new Thread(this).start();
+        alarmReader();
     }
 
     /** Logs any battery or charger property the firmware happens to expose, for later use. */
@@ -116,16 +121,42 @@ final class Docking implements Runnable {
         }
     }
 
-    /** Docked and in front: renews the backlight every few seconds. Undocked, it lapses by itself. */
+    /** Which other Nokia UI classes the phone has (for later use). */
+    private static String nokiaExtras() {
+        String[] n = {"com.nokia.mid.ui.DirectUtils", "com.nokia.mid.ui.DirectGraphics", "com.nokia.mid.sound.Sound"};
+        StringBuffer b = new StringBuffer();
+        for (int i = 0; i < n.length; i++) {
+            try {
+                Class.forName(n[i]);
+                b.append(", ").append(n[i].substring(n[i].lastIndexOf('.') + 1));
+            } catch (Throwable ignored) {}
+        }
+        return b.length() == 0 ? "" : " (also" + b.toString().substring(1) + ")";
+    }
+
+    /**
+     * Docked and in front: renews the backlight every few seconds, fading between levels instead of
+     * jumping: full, 10% at night, rising from 1% before an alarm (sunrise). At night the keypad
+     * light is switched off. Undocked, the light lapses by itself.
+     */
     private void keepLit() {
-        if (light == null || !docked || !app.keepLit || !app.shell.isShown()) return;
+        if (light == null || !docked || !app.shell.isShown()) return;
         long now = System.currentTimeMillis();
-        int level = night ? NIGHT_LIGHT : 100;
+        int rise = sunrise(now);
+        if (!app.keepLit && rise < 0) return;
+        int target = night ? NIGHT_LIGHT : 100;
+        if (rise >= 0) target = night ? Math.max(1, rise) : Math.max(target, rise);
+        int level = litLevel < 0 ? target : step(litLevel, target);
         if (now - litAt < 4000 && level == litLevel) return;
         litAt = now;
         litLevel = level;
         try {
-            light.level(level);
+            light.set(0, level);
+            int keys = night ? 0 : 100;
+            if (keys != keypadLevel && (keypadLevel != -1 || keys == 0)) {
+                try { light.set(1, keys); } catch (Throwable ignored) {}
+                keypadLevel = keys;
+            }
             if (!litLogged) {
                 app.log("Dock: keeping the screen on");
                 litLogged = true;
@@ -134,6 +165,91 @@ final class Docking implements Runnable {
             app.log("Dock: DeviceControl failed (" + t + ")");
             light = null;
         }
+    }
+
+    /** One fade step (4 a second): at most 15 percentage points. */
+    private static int step(int from, int to) {
+        int d = to - from;
+        if (d > 15) d = 15;
+        if (d < -15) d = -15;
+        return from + d;
+    }
+
+    /**
+     * Backlight percent during the sunrise before the next alarm: from 1% up to full, on a curve,
+     * over the minutes set in Settings; -1 outside it.
+     */
+    private int sunrise(long now) {
+        long at = nextAlarm;
+        int mins = app.sunriseMinutes;
+        if (at <= 0 || mins <= 0) return -1;
+        long left = at - now, span = mins * 60000L;
+        if (left > span || left <= 0) return -1;
+        int p = (int) ((span - left) * 100 / span);
+        return Math.max(1, p * p / 100);
+    }
+
+    /** Reads the controlled player's alarms from Lyrion every 5 minutes while docked. */
+    private void alarmReader() {
+        new Thread(new Runnable() {
+            public void run() {
+                while (true) {
+                    try { Thread.sleep(2000); } catch (InterruptedException e) {}
+                    long now = System.currentTimeMillis();
+                    if (!docked || app.player.length() == 0 || now - alarmsAt < 300000) continue;
+                    alarmsAt = now;
+                    try {
+                        long at = nextAlarmFromLyrion();
+                        if (at != nextAlarm) app.log("Dock: next alarm " + (at == 0 ? "none" : clock(at)));
+                        nextAlarm = at;
+                        app.shell.repaint();
+                    } catch (Throwable t) {
+                        app.log("Dock: alarms unavailable (" + t + ")");
+                    }
+                }
+            }
+        }).start();
+    }
+
+    private long nextAlarmFromLyrion() throws Exception {
+        try {
+            java.util.Hashtable on = app.lms.call(app.player, new String[]{"playerpref", "alarmsEnabled", "?"});
+            if ("0".equals(Json.str(on, "_p2"))) return 0;            // all alarms off for this player
+        } catch (Exception ignored) {}
+        java.util.Hashtable r = app.lms.call(app.player, new String[]{"alarms", "0", "20", "filter:enabled"});
+        java.util.Vector v = Json.arr(r, "alarms_loop");
+        if (v == null) return 0;
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        long now = System.currentTimeMillis();
+        int today = c.get(java.util.Calendar.DAY_OF_WEEK) - 1;      // Lyrion: 0 = Sunday
+        int secNow = c.get(java.util.Calendar.HOUR_OF_DAY) * 3600 + c.get(java.util.Calendar.MINUTE) * 60
+                + c.get(java.util.Calendar.SECOND);
+        long midnight = now - secNow * 1000L - c.get(java.util.Calendar.MILLISECOND);
+        long best = 0;
+        for (int i = 0; i < v.size(); i++) {
+            if (!(v.elementAt(i) instanceof java.util.Hashtable)) continue;
+            java.util.Hashtable a = (java.util.Hashtable) v.elementAt(i);
+            if ("0".equals(Json.str(a, "enabled"))) continue;
+            int t = Json.toInt(Json.str(a, "time"), -1);
+            if (t < 0) continue;
+            String dow = Json.str(a, "dow");
+            for (int d = 0; d < 8; d++) {
+                int day = (today + d) % 7;
+                if (dow != null && dow.length() > 0 && dow.indexOf((char) ('0' + day)) < 0) continue;
+                if (d == 0 && t <= secNow) continue;
+                long at = midnight + d * 86400000L + t * 1000L;
+                if (best == 0 || at < best) best = at;
+                break;
+            }
+        }
+        return best;
+    }
+
+    static String clock(long at) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTime(new java.util.Date(at));
+        int m = c.get(java.util.Calendar.MINUTE);
+        return c.get(java.util.Calendar.HOUR_OF_DAY) + ":" + (m < 10 ? "0" : "") + m;
     }
 
     private void tick() {
@@ -185,12 +301,21 @@ final class Docking implements Runnable {
     private void nightTick() {
         int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
         boolean nightTime = hour >= NIGHT_FROM || hour < NIGHT_TO;
+        long at = nextAlarm;
+        if (at > 0 && System.currentTimeMillis() >= at) {      // the alarm: day mode, full light, read the next one
+            nextAlarm = 0;
+            alarmsAt = 0;
+            woke = true;
+            app.log("Dock: alarm time");
+            if (night) setNight(false, false);
+        }
         if (!nightTime) {
             nightAnswer = 0;
+            woke = false;
             if (night && !nightByHand) setNight(false, false);
             return;
         }
-        if (night || asking || app.nightMode == OFF) return;
+        if (night || asking || woke || app.nightMode == OFF) return;
         if (app.nightMode == ALWAYS || nightAnswer == 1) {
             setNight(true, false);
             return;
@@ -262,6 +387,7 @@ final class Docking implements Runnable {
         docked = true;
         manual = byHand;
         litAt = 0;
+        alarmsAt = 0;                                    // read the alarms soon after docking
         upSince = -1;
         app.log("Dock: docked" + (byHand ? " (by hand)" : ""));
         app.display.callSerially(new Runnable() {
@@ -280,9 +406,13 @@ final class Docking implements Runnable {
         night = false;
         nightByHand = false;
         if (light != null && litLevel != -1 && litLevel != 100) {   // don't leave the screen dimmed
-            try { light.level(100); } catch (Throwable ignored) {}
+            try { light.set(0, 100); } catch (Throwable ignored) {}
+        }
+        if (light != null && keypadLevel == 0) {                     // nor the keypad dark
+            try { light.set(1, 100); } catch (Throwable ignored) {}
         }
         litLevel = -1;
+        keypadLevel = -1;
         final DockScreen sc = screen;
         screen = null;
         app.log("Dock: undocked");
