@@ -19,6 +19,10 @@ final class DockScreen extends NowPlayingScreen {
     private static final int CLOCK_ALPHA = 75;               // percent: slightly see-through, like the standby clock
     private static final int SCROLL_PAUSE = 1500, SCROLL_SPEED = 30, SCROLL_GAP = 40;   // ms, px/s, px
 
+    // night mode: red on black, like a bedside clock (Docking dims the backlight)
+    private static final int N_CLOCK = 0xff1a10, N_DATE = 0xc01008, N_TITLE = 0xd01008, N_SUB = 0x7a0804,
+            N_BAR = 0x2a0402, N_FILL = 0x9a0806, N_DISC = 0x1a0201, N_RING = 0x6a0604, N_GLYPH = 0xe01008;
+    private Image nightCover, nightSrc;
     private Image clockImg;                                  // the clock over its piece of background, redrawn each minute
     private String clockKey;
     private long scrollStart;
@@ -61,18 +65,24 @@ final class DockScreen extends NowPlayingScreen {
             return;
         }
         boolean ctl = controls();
+        boolean n = night();
+        if (n) {
+            g.setColor(0x000000);
+            g.fillRect(0, 0, w, h);
+        }
 
         // artwork
         int s = Math.min(h - 24, w / 2 - 16);
         int ax = 12, ay = (h - s) / 2;
-        if (cover != null) {
+        Image art = n ? redCover() : cover;
+        if (art != null) {
             g.clipRect(ax, ay, s, s);
-            g.drawImage(cover, ax + s / 2, ay + s / 2, Graphics.VCENTER | Graphics.HCENTER);
+            g.drawImage(art, ax + s / 2, ay + s / 2, Graphics.VCENTER | Graphics.HCENTER);
             g.setClip(0, 0, w, h);
         } else {
-            g.setColor(0x202020);
+            g.setColor(n ? N_DISC : 0x202020);
             g.fillRect(ax, ay, s, s);
-            Style.glyph(g, Style.G_NOTE, ax + s / 2, ay + s / 2, s / 3, 0x555555);
+            Style.glyph(g, Style.G_NOTE, ax + s / 2, ay + s / 2, s / 3, n ? N_RING : 0x555555);
         }
 
         // right column, everything aligned to its right edge like the standby clock
@@ -90,7 +100,7 @@ final class DockScreen extends NowPlayingScreen {
         String clock = hh + ":" + (mm < 10 ? "0" : "") + mm;
         if (b != null) {
             try {
-                drawClock(g, b, clock, right, y - px / 5, px, w, h);   // the SVG box has room above the digits
+                drawClock(g, b, clock, right, y - px / 5, px, w, h, n);   // the SVG box has room above the digits
             } catch (Throwable t) {
                 app.log("Dock clock: SVG failed (" + t + ")");
                 big = null;
@@ -99,12 +109,12 @@ final class DockScreen extends NowPlayingScreen {
         }
         if (b == null) {
             g.setFont(CLOCK_FALLBACK);
-            g.setColor(Style.TEXT);
+            g.setColor(n ? N_CLOCK : Style.TEXT);
             g.drawString(clock, right, y, Graphics.TOP | Graphics.RIGHT);
         }
         y += clockH + 8;
         g.setFont(DATE);
-        g.setColor(Style.TEXT);
+        g.setColor(n ? N_DATE : Style.TEXT);
         int day = c.get(Calendar.DAY_OF_MONTH), mon = c.get(Calendar.MONTH) + 1;
         g.drawString((day < 10 ? "0" : "") + day + "." + (mon < 10 ? "0" : "") + mon + "." + c.get(Calendar.YEAR),
                 right, y, Graphics.TOP | Graphics.RIGHT);
@@ -117,10 +127,10 @@ final class DockScreen extends NowPlayingScreen {
             scrollKey = track + "\n" + sub;
             scrollStart = now;
         }
-        g.setColor(Style.TEXT);
+        g.setColor(n ? N_TITLE : Style.TEXT);
         boolean moving = line(g, track, Style.BIG, left, right, y, w, h, now);
         y += Style.BIG.getHeight();
-        g.setColor(Style.TEXT_DIM);
+        g.setColor(n ? N_SUB : Style.TEXT_DIM);
         moving |= line(g, sub, Style.SMALL, left, right, y, w, h, now);
         scrolling = moving;
         y += Style.SMALL.getHeight();
@@ -133,10 +143,10 @@ final class DockScreen extends NowPlayingScreen {
         }
         // shown after a touch: progress and transport
         y += 8;
-        g.setColor(0x3a3a3a);
+        g.setColor(n ? N_BAR : 0x3a3a3a);
         g.fillRoundRect(left, y, cw, 3, 3, 3);
         if (dur > 0) {
-            g.setColor(Style.ACCENT);
+            g.setColor(n ? N_FILL : Style.ACCENT);
             g.fillRoundRect(left, y, Math.max(3, cw * Math.min(time, dur) / dur), 3, 3, 3);
         }
         y += 10;
@@ -144,22 +154,71 @@ final class DockScreen extends NowPlayingScreen {
         br = br2;
         by = y + br;
         bx = cx;
-        circle(g, cx - br * 3, by, br * 3 / 4, Style.G_PREV, false);
-        circle(g, cx, by, br, playing ? Style.G_PAUSE : Style.G_PLAY, true);
-        circle(g, cx + br * 3, by, br * 3 / 4, Style.G_NEXT, false);
+        if (n) {
+            redCircle(g, cx - br * 3, by, br * 3 / 4, Style.G_PREV);
+            redCircle(g, cx, by, br, playing ? Style.G_PAUSE : Style.G_PLAY);
+            redCircle(g, cx + br * 3, by, br * 3 / 4, Style.G_NEXT);
+        } else {
+            circle(g, cx - br * 3, by, br * 3 / 4, Style.G_PREV, false);
+            circle(g, cx, by, br, playing ? Style.G_PAUSE : Style.G_PLAY, true);
+            circle(g, cx + br * 3, by, br * 3 / 4, Style.G_NEXT, false);
+        }
+    }
+
+    boolean night() {
+        return app.docking != null && app.docking.night;
+    }
+
+    /** Soft-key labels in red at night. */
+    int ink() {
+        return night() ? N_TITLE : Style.TEXT;
+    }
+
+    private void redCircle(Graphics g, int x, int y, int r, int glyph) {
+        Style.glyph(g, Style.G_DOT, x, y, 2 * r, N_DISC);
+        Style.glyph(g, Style.G_RING, x, y, 2 * r, N_RING);
+        Style.glyph(g, glyph, x, y, r * 3 / 4, N_GLYPH);
+    }
+
+    /** The artwork in shades of red (brightness only), made once per cover. */
+    private Image redCover() {
+        Image c = cover;
+        if (c == null) return null;
+        if (c != nightSrc) {
+            try {
+                int cw = c.getWidth(), ch = c.getHeight();
+                int[] px = new int[cw * ch];
+                c.getRGB(px, 0, cw, 0, 0, cw, ch);
+                for (int i = 0; i < px.length; i++) {
+                    int p = px[i];
+                    int l = (((p >> 16) & 255) * 77 + ((p >> 8) & 255) * 150 + (p & 255) * 29) >> 8;
+                    px[i] = 0xff000000 | ((l * 3 / 4) << 16) | ((l / 16) << 8);
+                }
+                nightCover = Image.createRGBImage(px, cw, ch, false);
+            } catch (Throwable t) {
+                nightCover = null;                          // out of memory: no artwork at night
+            }
+            nightSrc = c;
+        }
+        return nightCover;
     }
 
     /** The clock from a cached image: SVG is rendered only when the minute or the layout changes. */
-    private void drawClock(Graphics g, BigText b, String text, int right, int y0, int px, int w, int h) throws Exception {
+    private void drawClock(Graphics g, BigText b, String text, int right, int y0, int px, int w, int h, boolean n) throws Exception {
         int iw = px * 3, ih = px * 6 / 5, x0 = right - iw;
-        String k = text + "/" + px + "/" + right + "/" + y0 + "/" + w + "x" + h;
+        String k = text + "/" + px + "/" + right + "/" + y0 + "/" + w + "x" + h + (n ? "/n" : "");
         if (!k.equals(clockKey)) {
             Image img = Image.createImage(iw, ih);
             Graphics ig = img.getGraphics();
-            ig.translate(-x0, -y0);                       // the background behind the clock, so translucency works
-            Style.background(ig, w, h);
-            ig.translate(x0, y0);
-            b.draw(ig, text, iw, 0, px, CLOCK_ALPHA);
+            if (n) {
+                ig.setColor(0x000000);
+                ig.fillRect(0, 0, iw, ih);
+            } else {
+                ig.translate(-x0, -y0);                   // the background behind the clock, so translucency works
+                Style.background(ig, w, h);
+                ig.translate(x0, y0);
+            }
+            b.draw(ig, text, iw, 0, px, n ? N_CLOCK : 0xffffff, CLOCK_ALPHA);
             clockImg = img;
             clockKey = k;
         }
@@ -240,13 +299,16 @@ final class DockScreen extends NowPlayingScreen {
     }
 
     String[] options() {
-        return new String[]{"Undock", "Choose player", "Shuffle on/off", "Repeat: off/all/one"};
+        return new String[]{"Undock", night() ? "Day mode" : "Night mode", "Choose player", "Shuffle on/off", "Repeat: off/all/one"};
     }
 
     void option(int i) {
         if (i == 0) app.shell.remove(this);
-        else if (i == 1) app.openPlayers();
-        else if (i == 2) send(new String[]{"playlist", "shuffle"});
-        else if (i == 3) send(new String[]{"playlist", "repeat"});
+        else if (i == 1) {
+            if (app.docking != null) app.docking.toggleNight();
+        }
+        else if (i == 2) app.openPlayers();
+        else if (i == 3) send(new String[]{"playlist", "shuffle"});
+        else if (i == 4) send(new String[]{"playlist", "repeat"});
     }
 }

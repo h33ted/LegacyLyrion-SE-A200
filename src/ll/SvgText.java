@@ -18,15 +18,21 @@ public final class SvgText implements BigText {
     private ScalableImage img;
     private int iw, ih;
 
-    public void draw(Graphics g, String text, int x, int y, int px, int alpha) throws Exception {
-        String k = text + "/" + px;
+    private static String hex(int rgb) {
+        String h = Integer.toHexString(rgb & 0xffffff);
+        while (h.length() < 6) h = "0" + h;
+        return h;
+    }
+
+    public void draw(Graphics g, String text, int x, int y, int px, int rgb, int alpha) throws Exception {
+        String k = text + "/" + px + "/" + rgb;
         if (!k.equals(key)) {                       // rebuilt only when the minute or the size changes
             iw = px * 3;                            // room for "23:59"; text is anchored at the right edge
             ih = px * 6 / 5;
             String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" baseProfile=\"tiny\""
                     + " width=\"" + iw + "\" height=\"" + ih + "\" viewBox=\"0 0 " + iw + " " + ih + "\">"
                     + "<text x=\"" + iw + "\" y=\"" + (px * 19 / 20) + "\" font-size=\"" + px + "\""
-                    + " text-anchor=\"end\" fill=\"#ffffff\">" + text + "</text></svg>";
+                    + " text-anchor=\"end\" fill=\"#" + hex(rgb) + "\">" + text + "</text></svg>";
             img = SVGImage.createImage(new ByteArrayInputStream(svg.getBytes("UTF-8")), null);
             img.setViewportWidth(iw);
             img.setViewportHeight(ih);

@@ -14,6 +14,13 @@ package ll;
 final class Docking implements Runnable {
     /** Settings values, in the order of the Settings choices. */
     static final int ASK = 0, ALWAYS = 1, OFF = 2;
+    static final int NIGHT_LIGHT = 10;                       // percent backlight in night mode
+    static final int NIGHT_FROM = 23, NIGHT_TO = 7;          // hours
+
+    /** Backlight control (NokiaLight), loaded by name. */
+    interface Light {
+        void level(int percent);
+    }
 
     private final LegacyLyrion app;
     volatile boolean docked;
@@ -24,8 +31,12 @@ final class Docking implements Runnable {
     private boolean asking;
     private long upSince = -1;
     private DockScreen screen;
-    private Runnable light;          // NokiaLight, if the phone has DeviceControl
+    private Light light;             // NokiaLight, if the phone has DeviceControl
     private long litAt;
+    private int litLevel = -1;
+    volatile boolean night;          // red-on-black, dimmed (DockScreen reads it)
+    private boolean nightByHand;     // switched from the menu: stays until switched back or undocked
+    private int nightAnswer;         // tonight's answer to "Night mode?": 0 not asked, 1 yes, 2 no
     private boolean litLogged;
 
     Docking(LegacyLyrion app) {
@@ -44,7 +55,7 @@ final class Docking implements Runnable {
         probe();
         try {                                    // Nokia UI API: the Aino carries it; steady light, no blinking
             Class.forName("com.nokia.mid.ui.DeviceControl");
-            light = (Runnable) Class.forName("ll.NokiaLight").newInstance();
+            light = (Light) Class.forName("ll.NokiaLight").newInstance();
             app.log("Dock: Nokia DeviceControl present");
         } catch (Throwable t) {
             app.log("Dock: no Nokia DeviceControl; the light follows the phone's setting");
@@ -109,10 +120,12 @@ final class Docking implements Runnable {
     private void keepLit() {
         if (light == null || !docked || !app.keepLit || !app.shell.isShown()) return;
         long now = System.currentTimeMillis();
-        if (now - litAt < 4000) return;
+        int level = night ? NIGHT_LIGHT : 100;
+        if (now - litAt < 4000 && level == litLevel) return;
         litAt = now;
+        litLevel = level;
         try {
-            light.run();
+            light.level(level);
             if (!litLogged) {
                 app.log("Dock: keeping the screen on");
                 litLogged = true;
@@ -130,6 +143,7 @@ final class Docking implements Runnable {
         boolean wide = s.sideways();
 
         if (docked) {
+            nightTick();
             if (screen != null && !s.holds(screen)) {     // left with Undock / Back
                 declined = true;
                 leave(false);
@@ -165,6 +179,59 @@ final class Docking implements Runnable {
         if (!want) return;
         if (app.dockMode == ALWAYS || accepted) enter(false);
         else ask();
+    }
+
+    /** Between 23:00 and 07:00, docked: ask "Night mode?" once a night (or switch it on, if "Always"). */
+    private void nightTick() {
+        int hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        boolean nightTime = hour >= NIGHT_FROM || hour < NIGHT_TO;
+        if (!nightTime) {
+            nightAnswer = 0;
+            if (night && !nightByHand) setNight(false, false);
+            return;
+        }
+        if (night || asking || app.nightMode == OFF) return;
+        if (app.nightMode == ALWAYS || nightAnswer == 1) {
+            setNight(true, false);
+            return;
+        }
+        if (nightAnswer != 0 || !app.shell.isShown()) return;
+        asking = true;
+        app.display.callSerially(new Runnable() {
+            public void run() {
+                app.shell.prompt("Night mode?", new String[]{"Yes", "Not tonight", "Always at night"},
+                        new Shell.Chooser() {
+                            public void chose(int k) {
+                                asking = false;
+                                if (k == 0) {
+                                    nightAnswer = 1;
+                                    setNight(true, false);
+                                } else if (k == 2) {
+                                    nightAnswer = 1;
+                                    app.nightMode = ALWAYS;
+                                    app.save();
+                                    setNight(true, false);
+                                } else {
+                                    nightAnswer = 2;        // "Not tonight" or Back
+                                }
+                            }
+                        });
+            }
+        });
+    }
+
+    /** More > Night mode / Day mode on the docked screen. */
+    void toggleNight() {
+        setNight(!night, true);
+        if (!night) nightAnswer = 2;                      // switched off by hand: don't ask again tonight
+    }
+
+    private void setNight(boolean on, boolean byHand) {
+        night = on;
+        nightByHand = on && byHand;
+        litAt = 0;                                        // new brightness right away
+        app.log("Dock: night mode " + (on ? "on" : "off"));
+        app.shell.repaint();
     }
 
     private void ask() {
@@ -210,6 +277,12 @@ final class Docking implements Runnable {
     private void leave(final boolean closeScreen) {
         docked = false;
         manual = false;
+        night = false;
+        nightByHand = false;
+        if (light != null && litLevel != -1 && litLevel != 100) {   // don't leave the screen dimmed
+            try { light.level(100); } catch (Throwable ignored) {}
+        }
+        litLevel = -1;
         final DockScreen sc = screen;
         screen = null;
         app.log("Dock: undocked");

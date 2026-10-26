@@ -376,7 +376,7 @@ final class Shell extends Canvas {
         g.fillRect(0, sy, w, sh);
         g.setColor(0x262626);
         g.drawLine(0, sy, w, sy);
-        g.setColor(Style.TEXT);
+        g.setColor(s.ink());
         String l, c, r;
         if (menu != null) {
             l = null;

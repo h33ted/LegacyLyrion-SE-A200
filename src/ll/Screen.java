@@ -59,4 +59,9 @@ abstract class Screen {
     boolean bare() {
         return false;
     }
+
+    /** Colour of the soft-key labels (red in the dock's night mode). */
+    int ink() {
+        return Style.TEXT;
+    }
 }
