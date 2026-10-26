@@ -111,20 +111,23 @@ final class Style {
     /** Translucent dark panel with a thin grey frame (lists, menus, messages). */
     static void panel(Graphics g, int x, int y, int w, int h) {
         if (w <= 4 || h <= 4) return;
-        Image p = glassFor("p", w, h, 0x2e2e2e, 0x0c0c0c, 0xd8);
+        Image p = glassFor("p", w, h, 0x2e2e2e, 0x0c0c0c, 0xb4);   // lists stay readable, the glow shows a little
         g.drawImage(p, x, y, Graphics.TOP | Graphics.LEFT);
         g.setColor(FRAME);
         g.drawRoundRect(x, y, w - 1, h - 1, 6, 6);
     }
 
-    /** The focused entry of the home menu: lighter glass box with a grey frame. */
+    /**
+     * The focused entry of the home menu, as in Sony Ericsson's own media apps: faint light glass the
+     * background glow shows through, a thin light-grey frame and a soft highlight along the top.
+     */
     static void focusBox(Graphics g, int x, int y, int w, int h) {
         if (w <= 4 || h <= 4) return;
-        Image p = glassFor("b", w, h, 0x3c3c3c, 0x141414, 0xc8);
+        Image p = glassFor("b", w, h, 0x7a7a7a, 0x3a3a3a, 0x48);
         g.drawImage(p, x, y, Graphics.TOP | Graphics.LEFT);
-        g.setColor(0x9a9a9a);
+        g.setColor(0x8c8c8c);
         g.drawRect(x, y, w - 1, h - 1);
-        g.setColor(0x4a4a4a);
+        g.setColor(0x6a6a6a);
         g.drawLine(x + 1, y + 1, x + w - 2, y + 1);
     }
 
