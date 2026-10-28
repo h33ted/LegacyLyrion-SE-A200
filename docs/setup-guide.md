@@ -177,7 +177,9 @@ The Aino doesn't tell Java apps whether it is charging, so docked mode goes by p
 
 **LegacyLyrion-Standby** (`LegacyLyrion-Standby.jar` and `.jad` in the release) puts the current artwork on the phone's standby screen: the cover, centred, over a blurred and darkened copy of itself that fills the screen in the cover's own colours. Install it like the app, then pick it under **Settings → Display → Wallpaper → Application** on the phone (the wording varies by model).
 
-It is a separate small app that reads the server and the player you control from LegacyLyrion's settings, so start LegacyLyrion once (0.8.4 or newer) before choosing it. It only asks Lyrion for updates while the standby screen is showing, and leaves the keys to the phone. Allow its network access permanently too ([how](#allow-network-access)), or the phone may ask each time standby shows.
+It is a separate small app that reads the server and the player you control from LegacyLyrion's settings, so start LegacyLyrion once (0.8.4 or newer) before choosing it. It only asks Lyrion for updates while the standby screen is showing, and leaves the keys to the phone.
+
+**Its settings:** press **#** twice on it (if the phone keeps the keys in standby, open *LegacyLyrion Standby* from the Applications menu and press **#** twice there). *When nothing plays* (after the minutes you set, 1 by default) it can show the orange glow, **a picture of your choice** (*Choose picture* browses the phone memory and card; a picture the size of the screen works best), or the **phone's own wallpaper**: that closes the standby app so the phone can show its theme, and the app may only come back once standby is shown again (an experiment; let us know what your phone does). Choosing a picture needs the app's *Read user data* permission. Allow its network access permanently too ([how](#allow-network-access)), or the phone may ask each time standby shows.
 
 ## Controls
 
