@@ -110,6 +110,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     private void load() {
         try {
             RecordStore rs = RecordStore.openRecordStore("legacylyrion", true);
+            share(rs);
             if (rs.getNumRecords() > 0) {
                 String[] f = split(new String(rs.getRecord(1), "UTF-8"));
                 if (f.length > 0) lms.host = f[0];
@@ -151,8 +152,16 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
             RecordStore rs = RecordStore.openRecordStore("legacylyrion", true);
             if (rs.getNumRecords() == 0) rs.addRecord(b, 0, b.length);
             else rs.setRecord(1, b, 0, b.length);
+            share(rs);
             rs.closeRecordStore();
         } catch (Exception ignored) {}
+    }
+
+    /** Lets the standby wallpaper suite (LegacyLyrion Standby) read the server and player; read-only for it. */
+    private static void share(RecordStore rs) {
+        try {
+            rs.setMode(RecordStore.AUTHMODE_ANY, false);
+        } catch (Throwable ignored) {}
     }
 
     /** Docked-mode wait from Settings or RMS: 0 to 120 seconds. */

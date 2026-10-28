@@ -3,7 +3,7 @@ rem Windows version of build.sh: builds dist\LegacyLyrion-Aino.jar and LegacyLyr
 rem Needs JDK 11 or newer on PATH; the jars in lib\ are downloaded on the first build (curl ships with Windows 10+).
 setlocal
 cd /d "%~dp0"
-if "%VER%"=="" set VER=0.8.3
+if "%VER%"=="" set VER=0.8.4
 if not exist lib mkdir lib
 set M2=https://repo1.maven.org/maven2
 if not exist lib\ecj-4.6.1.jar curl.exe -fsSL -o lib\ecj-4.6.1.jar %M2%/org/eclipse/jdt/core/compiler/ecj/4.6.1/ecj-4.6.1.jar || exit /b 1
@@ -33,7 +33,25 @@ rem One jar fits every A200 phone; two labelled copies (Aino 240x432 touch, A200
 call :target Aino "Sony Ericsson Aino, 240x432 touch"
 call :target A200 "W995, C905, W705 and other 240x320 phones"
 del dist\LegacyLyrion.jar
-echo built dist\LegacyLyrion-Aino.jar and LegacyLyrion-A200.jar (%SIZE% bytes)
+rem Standby wallpaper: a second, light suite (Sony Ericsson: Settings > Display > Wallpaper > Application)
+(
+echo Manifest-Version: 1.0
+echo MIDlet-1: LegacyLyrion Standby, /icon.png, ll.Standby
+echo MIDlet-Name: LegacyLyrion Standby
+echo MIDlet-Vendor: h33ted
+echo MIDlet-Version: %VER%
+echo MIDlet-Icon: /icon.png
+echo MicroEdition-Configuration: CLDC-1.1
+echo MicroEdition-Profile: MIDP-2.0
+echo SEMC-StandbyApplication: Y
+) > build\STANDBY.MF
+java tools\Pack.java dist\LegacyLyrion-Standby.jar build\STANDBY.MF build\classes || exit /b 1
+for %%A in (dist\LegacyLyrion-Standby.jar) do set SSIZE=%%~zA
+findstr /v "Manifest-Version" build\STANDBY.MF > dist\LegacyLyrion-Standby.jad
+echo MIDlet-Description: Now playing on the standby screen>> dist\LegacyLyrion-Standby.jad
+echo MIDlet-Jar-Size: %SSIZE%>> dist\LegacyLyrion-Standby.jad
+echo MIDlet-Jar-URL: LegacyLyrion-Standby.jar>> dist\LegacyLyrion-Standby.jad
+echo built dist\LegacyLyrion-Aino.jar, LegacyLyrion-A200.jar (%SIZE% bytes) and LegacyLyrion-Standby.jar
 goto :eof
 
 :target

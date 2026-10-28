@@ -10,7 +10,7 @@
 # so no separate preverify step is required.
 set -e
 cd "$(dirname "$0")"
-VER=${VER:-0.8.3}
+VER=${VER:-0.8.4}
 # Test builds: LL_SERVER=192.168.1.20:9000 sh build.sh  -> dist-test/ with the server preset
 OUT=dist
 M2=https://repo1.maven.org/maven2
@@ -57,4 +57,20 @@ for T in Aino A200; do
   { cat build/MANIFEST.MF | grep -v '^Manifest-Version'; echo "MIDlet-Description: $D"; echo "MIDlet-Jar-Size: $SIZE"; echo "MIDlet-Jar-URL: LegacyLyrion-$T.jar"; } > $OUT/LegacyLyrion-$T.jad
 done
 rm $OUT/LegacyLyrion.jar
-echo "built $OUT/LegacyLyrion-Aino.jar and LegacyLyrion-A200.jar ($SIZE bytes)"
+# Standby wallpaper: a second, light suite with the same classes and ll.Standby as its MIDlet.
+# Sony Ericsson phones list it under Settings > Display > Wallpaper > Application.
+cat > build/STANDBY.MF <<MF
+Manifest-Version: 1.0
+MIDlet-1: LegacyLyrion Standby, /icon.png, ll.Standby
+MIDlet-Name: LegacyLyrion Standby
+MIDlet-Vendor: h33ted
+MIDlet-Version: $VER
+MIDlet-Icon: /icon.png
+MicroEdition-Configuration: CLDC-1.1
+MicroEdition-Profile: MIDP-2.0
+SEMC-StandbyApplication: Y
+MF
+java tools/Pack.java $OUT/LegacyLyrion-Standby.jar build/STANDBY.MF build/classes
+SSIZE=$(wc -c < $OUT/LegacyLyrion-Standby.jar | tr -d ' ')
+{ grep -v '^Manifest-Version' build/STANDBY.MF; echo "MIDlet-Description: Now playing on the standby screen"; echo "MIDlet-Jar-Size: $SSIZE"; echo "MIDlet-Jar-URL: LegacyLyrion-Standby.jar"; } > $OUT/LegacyLyrion-Standby.jad
+echo "built $OUT/LegacyLyrion-Aino.jar, LegacyLyrion-A200.jar ($SIZE bytes) and LegacyLyrion-Standby.jar"
