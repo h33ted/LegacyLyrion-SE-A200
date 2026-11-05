@@ -2,7 +2,7 @@
 rem Windows version of build.sh: builds the Aino (touch) and A200 (keypad) variants and the Standby
 rem wallpaper (+ .jad) into dist\<version>\. Each variant gets a generated ll\Build.java; the A200 build
 rem has no touch code and no Standby class. Nothing is deleted: each build compiles into its own
-rem folder, build\<version>-<date-time>\.
+rem folder, build\<version>-<date-time>\. The newest jars are also copied to dist\ itself (for the release workflow).
 rem Needs JDK 11 or newer on PATH; the jars in lib\ are downloaded on the first build (curl ships with Windows 10+).
 setlocal
 cd /d "%~dp0"
@@ -42,6 +42,7 @@ findstr /v "Manifest-Version" %B%\STANDBY.MF > %O%\LegacyLyrion-Standby.jad
 echo MIDlet-Description: Now playing on the standby screen>> %O%\LegacyLyrion-Standby.jad
 echo MIDlet-Jar-Size: %SSIZE%>> %O%\LegacyLyrion-Standby.jad
 echo MIDlet-Jar-URL: LegacyLyrion-Standby.jar>> %O%\LegacyLyrion-Standby.jad
+copy /y %O%\LegacyLyrion-Standby.ja? dist\ >nul
 echo built %O%\LegacyLyrion-Standby.jar (%SSIZE% bytes)
 goto :eof
 
@@ -81,5 +82,6 @@ for %%A in (%O%\LegacyLyrion-%V%.jar) do set SIZE=%%~zA
 findstr /v "Manifest-Version" %B%\%V%\MANIFEST.MF > %O%\LegacyLyrion-%V%.jad
 echo MIDlet-Jar-Size: %SIZE%>> %O%\LegacyLyrion-%V%.jad
 echo MIDlet-Jar-URL: LegacyLyrion-%V%.jar>> %O%\LegacyLyrion-%V%.jad
+copy /y %O%\LegacyLyrion-%V%.ja? dist\ >nul
 echo built %O%\LegacyLyrion-%V%.jar (%SIZE% bytes)
 goto :eof

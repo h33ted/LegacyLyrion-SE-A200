@@ -7,6 +7,7 @@
 # Each variant gets a generated ll/Build.java (TOUCH, VARIANT, update CHANNEL); TOUCH is a
 # compile-time constant, so the A200 jar doesn't contain the touch handling at all.
 # Nothing is deleted: each build compiles into its own folder, build/<version>-<date-time>/.
+# The newest jars are also copied to dist/ itself, where the GitHub release workflow picks them up.
 # Needs: JDK 11 or newer (runs the compiler and tools/Pack.java) and these jars in lib/, which are
 # downloaded from Maven Central on the first build if missing:
 #   ecj-4.6.1.jar      https://repo1.maven.org/maven2/org/eclipse/jdt/core/compiler/ecj/4.6.1/ecj-4.6.1.jar
@@ -30,6 +31,7 @@ done
 if [ -n "$LL_SERVER" ]; then OUT=dist-test; fi
 STAMP=$(date +%Y%m%d-%H%M%S)
 B=build/$VER-$STAMP
+LATEST=$OUT
 OUT=$OUT/$VER
 mkdir -p $B/stubs $OUT
 API=lib/cldcapi11-2.0.4.jar:lib/midpapi20-2.0.4.jar
@@ -80,6 +82,7 @@ MF
   java tools/Pack.java $OUT/LegacyLyrion-$V.jar $B/$V/MANIFEST.MF $B/$V/classes
   SIZE=$(wc -c < $OUT/LegacyLyrion-$V.jar | tr -d ' ')
   { grep -v '^Manifest-Version' $B/$V/MANIFEST.MF; echo "MIDlet-Jar-Size: $SIZE"; echo "MIDlet-Jar-URL: LegacyLyrion-$V.jar"; } > $OUT/LegacyLyrion-$V.jad
+  cp $OUT/LegacyLyrion-$V.jar $OUT/LegacyLyrion-$V.jad $LATEST/
   echo "built $OUT/LegacyLyrion-$V.jar ($SIZE bytes)"
 done
 
@@ -99,4 +102,5 @@ MF
 java tools/Pack.java $OUT/LegacyLyrion-Standby.jar $B/STANDBY.MF $B/Aino/classes
 SSIZE=$(wc -c < $OUT/LegacyLyrion-Standby.jar | tr -d ' ')
 { grep -v '^Manifest-Version' $B/STANDBY.MF; echo "MIDlet-Description: Now playing on the standby screen"; echo "MIDlet-Jar-Size: $SSIZE"; echo "MIDlet-Jar-URL: LegacyLyrion-Standby.jar"; } > $OUT/LegacyLyrion-Standby.jad
+cp $OUT/LegacyLyrion-Standby.jar $OUT/LegacyLyrion-Standby.jad $LATEST/
 echo "built $OUT/LegacyLyrion-Standby.jar ($SSIZE bytes)"
