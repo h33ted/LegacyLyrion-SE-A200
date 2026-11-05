@@ -4,6 +4,7 @@ import java.util.Hashtable;
 import java.util.Vector;
 
 import javax.microedition.lcdui.Canvas;
+import javax.microedition.lcdui.Font;
 import javax.microedition.lcdui.Graphics;
 import javax.microedition.lcdui.Image;
 
@@ -33,11 +34,50 @@ class NowPlayingScreen extends Screen implements Runnable {
         running = true;
         gen++;
         new Thread(this).start();
+        final int my = gen;
+        new Thread(new Runnable() {                       // smooth scrolling for long titles (~14 fps)
+            public void run() {
+                while (running && my == gen) {
+                    try { Thread.sleep(70); } catch (InterruptedException e) {}
+                    if (npScrolling && running && my == gen) app.shell.repaint();
+                }
+            }
+        }).start();
     }
 
     void hidden() {
         running = false;
         gen++;
+    }
+
+    // ------------------------------------------------------------------ scrolling text
+
+    private static final int SCROLL_PAUSE = 1500, SCROLL_SPEED = 30, SCROLL_GAP = 40;   // ms, px/s, px
+    private long scrollStart;
+    private String scrollKey;
+    volatile boolean npScrolling;
+
+    /**
+     * One line centred in [left, left + width) when it fits; otherwise it waits, then scrolls round,
+     * marquee-style. Returns true while it is scrolling.
+     */
+    boolean marquee(Graphics g, String text, Font f, int left, int width, int y, int w, int h) {
+        g.setFont(f);
+        int tw = f.stringWidth(text);
+        if (tw <= width) {
+            g.drawString(text, left + width / 2, y, Graphics.TOP | Graphics.HCENTER);
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        int loop = tw + SCROLL_GAP;
+        long cycle = SCROLL_PAUSE + (long) loop * 1000 / SCROLL_SPEED;
+        long ph = (now - scrollStart) % cycle;
+        int off = ph < SCROLL_PAUSE ? 0 : (int) ((ph - SCROLL_PAUSE) * SCROLL_SPEED / 1000);
+        g.clipRect(left, y, width, f.getHeight());
+        g.drawString(text, left - off, y, Graphics.TOP | Graphics.LEFT);
+        g.drawString(text, left - off + loop, y, Graphics.TOP | Graphics.LEFT);
+        g.setClip(0, 0, w, h);
+        return true;
     }
 
     public void run() {
@@ -136,14 +176,17 @@ class NowPlayingScreen extends Screen implements Runnable {
         int cx = left + cw / 2;
         int y = wide ? 8 : ay + s2 + 10;
 
-        g.setFont(Style.BIG);
-        g.setColor(Style.TEXT);
-        g.drawString(Style.fit(track, Style.BIG, cw - 16), cx, y, Graphics.TOP | Graphics.HCENTER);
-        y += Style.BIG.getHeight();
-        g.setFont(Style.SMALL);
-        g.setColor(Style.TEXT_DIM);
         String sub = album.length() > 0 ? artist + " - " + album : artist;
-        g.drawString(Style.fit(sub, Style.SMALL, cw - 16), cx, y, Graphics.TOP | Graphics.HCENTER);
+        if (!(track + "\n" + sub).equals(scrollKey)) {   // new track: scrolling starts over
+            scrollKey = track + "\n" + sub;
+            scrollStart = System.currentTimeMillis();
+        }
+        g.setColor(Style.TEXT);
+        boolean moving = marquee(g, track, Style.BIG, left + 8, cw - 16, y, w, h);
+        y += Style.BIG.getHeight();
+        g.setColor(Style.TEXT_DIM);
+        moving |= marquee(g, sub, Style.SMALL, left + 8, cw - 16, y, w, h);
+        npScrolling = moving;
         y += Style.SMALL.getHeight() + 8;
 
         // progress
@@ -163,6 +206,7 @@ class NowPlayingScreen extends Screen implements Runnable {
         // transport: Walkman-style round buttons
         int room = h - y - 22;                      // leave space for the volume bar
         br = Math.max(14, Math.min(28, wide ? room / 2 : (h - y) / 3));
+        br = Math.min(br, Math.max(10, (cw / 2 - 6) * 4 / 15));   // the outer buttons reach 3.75 radii out: keep them on screen
         by = y + br;
         bx = cx;
         circle(g, cx - br * 3, by, br * 3 / 4, Style.G_PREV, false);
@@ -223,16 +267,18 @@ class NowPlayingScreen extends Screen implements Runnable {
 
     String[] options() {
         return app.docking != null
-                ? new String[]{"Shuffle on/off", "Repeat: off/all/one", "Choose player", "Clear queue", "Docked mode"}
-                : new String[]{"Shuffle on/off", "Repeat: off/all/one", "Choose player", "Clear queue"};
+                ? new String[]{"Add to library", "Shuffle on/off", "Repeat: off/all/one", "Choose player", "Clear queue", "Docked mode"}
+                : new String[]{"Add to library", "Shuffle on/off", "Repeat: off/all/one", "Choose player", "Clear queue"};
     }
 
     void option(int i) {
-        if (i == 0) send(new String[]{"playlist", "shuffle"});
-        else if (i == 1) send(new String[]{"playlist", "repeat"});
-        else if (i == 2) app.openPlayers();
-        else if (i == 3) send(new String[]{"playlist", "clear"});
-        else if (i == 4 && app.docking != null) app.docking.dockNow();
+        String o = options()[i];
+        if (o.equals("Add to library")) app.addToLibrary();
+        else if (o.startsWith("Shuffle")) send(new String[]{"playlist", "shuffle"});
+        else if (o.startsWith("Repeat")) send(new String[]{"playlist", "repeat"});
+        else if (o.equals("Choose player")) app.openPlayers();
+        else if (o.equals("Clear queue")) send(new String[]{"playlist", "clear"});
+        else if (o.equals("Docked mode") && app.docking != null) app.docking.dockNow();
     }
 
     void send(final String[] cmd) {

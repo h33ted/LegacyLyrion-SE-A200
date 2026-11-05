@@ -317,7 +317,7 @@ final class DockScreen extends NowPlayingScreen {
     }
 
     String[] options() {
-        return new String[]{"Undock", night() ? "Day mode" : "Night mode", "Choose player", "Shuffle on/off", "Repeat: off/all/one"};
+        return new String[]{"Undock", night() ? "Day mode" : "Night mode", "Add to library", "Choose player", "Shuffle on/off", "Repeat: off/all/one"};
     }
 
     void option(int i) {
@@ -325,8 +325,9 @@ final class DockScreen extends NowPlayingScreen {
         else if (i == 1) {
             if (app.docking != null) app.docking.toggleNight();
         }
-        else if (i == 2) app.openPlayers();
-        else if (i == 3) send(new String[]{"playlist", "shuffle"});
-        else if (i == 4) send(new String[]{"playlist", "repeat"});
+        else if (i == 2) app.addToLibrary();
+        else if (i == 3) app.openPlayers();
+        else if (i == 4) send(new String[]{"playlist", "shuffle"});
+        else if (i == 5) send(new String[]{"playlist", "repeat"});
     }
 }

@@ -1,39 +1,30 @@
 @echo off
-rem Windows version of build.sh: builds dist\LegacyLyrion-Aino.jar and LegacyLyrion-A200.jar (+ .jad).
+rem Windows version of build.sh: builds the Aino (touch) and A200 (keypad) variants and the Standby
+rem wallpaper (+ .jad) into dist\<version>\. Each variant gets a generated ll\Build.java; the A200 build
+rem has no touch code and no Standby class. Nothing is deleted: each build compiles into its own
+rem folder, build\<version>-<date-time>\.
 rem Needs JDK 11 or newer on PATH; the jars in lib\ are downloaded on the first build (curl ships with Windows 10+).
 setlocal
 cd /d "%~dp0"
-if "%VER%"=="" set VER=0.8.6
+if "%VER%"=="" set VER=0.9.1
 if not exist lib mkdir lib
 set M2=https://repo1.maven.org/maven2
 if not exist lib\ecj-4.6.1.jar curl.exe -fsSL -o lib\ecj-4.6.1.jar %M2%/org/eclipse/jdt/core/compiler/ecj/4.6.1/ecj-4.6.1.jar || exit /b 1
 if not exist lib\cldcapi11-2.0.4.jar curl.exe -fsSL -o lib\cldcapi11-2.0.4.jar %M2%/org/microemu/cldcapi11/2.0.4/cldcapi11-2.0.4.jar || exit /b 1
 if not exist lib\midpapi20-2.0.4.jar curl.exe -fsSL -o lib\midpapi20-2.0.4.jar %M2%/org/microemu/midpapi20/2.0.4/midpapi20-2.0.4.jar || exit /b 1
-if exist build rmdir /s /q build
-if exist dist rmdir /s /q dist
-mkdir build\classes build\stubs dist
+for /f %%T in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set STAMP=%%T
+set B=build\%VER%-%STAMP%
+set O=dist\%VER%
+set API=lib\cldcapi11-2.0.4.jar;lib\midpapi20-2.0.4.jar
+mkdir %B%\stubs
+if not exist %O% mkdir %O%
 rem Compile-time stubs for APIs the phone provides (JSR-256 sensors, Nokia UI DeviceControl, JSR-226 SVG, JSR-75 files); never packaged.
-java -jar lib\ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn -bootclasspath lib\cldcapi11-2.0.4.jar;lib\midpapi20-2.0.4.jar -d build\stubs stubs\javax\microedition\sensor\*.java stubs\com\nokia\mid\ui\*.java stubs\javax\microedition\m2g\*.java stubs\javax\microedition\io\file\*.java || exit /b 1
-java -jar lib\ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn -bootclasspath lib\cldcapi11-2.0.4.jar;lib\midpapi20-2.0.4.jar;build\stubs -d build\classes src\ll\*.java || exit /b 1
-copy /y res\icon.png build\classes\icon.png >nul
-(
-echo Manifest-Version: 1.0
-echo MIDlet-1: LegacyLyrion, /icon.png, ll.LegacyLyrion
-echo MIDlet-Name: LegacyLyrion
-echo MIDlet-Vendor: h33ted
-echo MIDlet-Version: %VER%
-echo MIDlet-Icon: /icon.png
-echo MicroEdition-Configuration: CLDC-1.1
-echo MicroEdition-Profile: MIDP-2.0
-) > build\MANIFEST.MF
-rem Phone-friendly zip (see tools\Pack.java)
-java tools\Pack.java dist\LegacyLyrion.jar build\MANIFEST.MF build\classes || exit /b 1
-for %%A in (dist\LegacyLyrion.jar) do set SIZE=%%~zA
-rem One jar fits every A200 phone; two labelled copies (Aino 240x432 touch, A200 240x320 keypad).
-call :target Aino "Sony Ericsson Aino, 240x432 touch"
-call :target A200 "W995, C905, W705 and other 240x320 phones"
-del dist\LegacyLyrion.jar
-rem Standby wallpaper: a second, light suite (Sony Ericsson: Settings > Display > Wallpaper > Application)
+java -jar lib\ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn -bootclasspath %API% -d %B%\stubs stubs\javax\microedition\sensor\*.java stubs\com\nokia\mid\ui\*.java stubs\javax\microedition\m2g\*.java stubs\javax\microedition\io\file\*.java || exit /b 1
+
+call :variant Aino true aino "Sony Ericsson Aino, 240x432 touch" || exit /b 1
+call :variant A200 false j2me "W995, C905, W705 and other 240x320 phones" || exit /b 1
+
+rem Standby wallpaper: a second, light suite with the Aino classes (Sony Ericsson: Settings > Display > Wallpaper > Application)
 (
 echo Manifest-Version: 1.0
 echo MIDlet-1: LegacyLyrion Standby, /icon.png, ll.Standby
@@ -44,20 +35,51 @@ echo MIDlet-Icon: /icon.png
 echo MicroEdition-Configuration: CLDC-1.1
 echo MicroEdition-Profile: MIDP-2.0
 echo SEMC-StandbyApplication: Y
-) > build\STANDBY.MF
-java tools\Pack.java dist\LegacyLyrion-Standby.jar build\STANDBY.MF build\classes || exit /b 1
-for %%A in (dist\LegacyLyrion-Standby.jar) do set SSIZE=%%~zA
-findstr /v "Manifest-Version" build\STANDBY.MF > dist\LegacyLyrion-Standby.jad
-echo MIDlet-Description: Now playing on the standby screen>> dist\LegacyLyrion-Standby.jad
-echo MIDlet-Jar-Size: %SSIZE%>> dist\LegacyLyrion-Standby.jad
-echo MIDlet-Jar-URL: LegacyLyrion-Standby.jar>> dist\LegacyLyrion-Standby.jad
-echo built dist\LegacyLyrion-Aino.jar, LegacyLyrion-A200.jar (%SIZE% bytes) and LegacyLyrion-Standby.jar
+) > %B%\STANDBY.MF
+java tools\Pack.java %O%\LegacyLyrion-Standby.jar %B%\STANDBY.MF %B%\Aino\classes || exit /b 1
+for %%A in (%O%\LegacyLyrion-Standby.jar) do set SSIZE=%%~zA
+findstr /v "Manifest-Version" %B%\STANDBY.MF > %O%\LegacyLyrion-Standby.jad
+echo MIDlet-Description: Now playing on the standby screen>> %O%\LegacyLyrion-Standby.jad
+echo MIDlet-Jar-Size: %SSIZE%>> %O%\LegacyLyrion-Standby.jad
+echo MIDlet-Jar-URL: LegacyLyrion-Standby.jar>> %O%\LegacyLyrion-Standby.jad
+echo built %O%\LegacyLyrion-Standby.jar (%SSIZE% bytes)
 goto :eof
 
-:target
-copy /y dist\LegacyLyrion.jar dist\LegacyLyrion-%1.jar >nul
-findstr /v "Manifest-Version" build\MANIFEST.MF > dist\LegacyLyrion-%1.jad
-echo MIDlet-Description: %~2>> dist\LegacyLyrion-%1.jad
-echo MIDlet-Jar-Size: %SIZE%>> dist\LegacyLyrion-%1.jad
-echo MIDlet-Jar-URL: LegacyLyrion-%1.jar>> dist\LegacyLyrion-%1.jad
+rem :variant <name> <touch true/false> <update channel> <description>
+:variant
+set V=%1
+mkdir %B%\%V%\classes %B%\%V%\gen\ll
+(
+echo package ll;
+echo.
+echo /** Generated by build.cmd: which variant this jar is. */
+echo final class Build {
+echo     static final boolean TOUCH = %2;
+echo     static final String VARIANT = "%V%";
+echo     static final String CHANNEL = "%3";
+echo }
+) > %B%\%V%\gen\ll\Build.java
+rem the sources as an ecj argument file; the A200 build leaves out the Standby wallpaper
+(for %%F in (src\ll\*.java) do @if /i not "%V%%%~nxF"=="A200Standby.java" echo %%F) > %B%\%V%\sources.txt
+echo %B%\%V%\gen\ll\Build.java>> %B%\%V%\sources.txt
+java -jar lib\ecj-4.6.1.jar -source 1.3 -target cldc1.1 -nowarn -bootclasspath %API%;%B%\stubs -d %B%\%V%\classes @%B%\%V%\sources.txt || exit /b 1
+copy /y res\icon.png %B%\%V%\classes\icon.png >nul
+(
+echo Manifest-Version: 1.0
+echo MIDlet-1: LegacyLyrion, /icon.png, ll.LegacyLyrion
+echo MIDlet-Name: LegacyLyrion
+echo MIDlet-Vendor: h33ted
+echo MIDlet-Version: %VER%
+echo MIDlet-Icon: /icon.png
+echo MIDlet-Description: %~4
+echo MicroEdition-Configuration: CLDC-1.1
+echo MicroEdition-Profile: MIDP-2.0
+) > %B%\%V%\MANIFEST.MF
+rem Phone-friendly zip (see tools\Pack.java)
+java tools\Pack.java %O%\LegacyLyrion-%V%.jar %B%\%V%\MANIFEST.MF %B%\%V%\classes || exit /b 1
+for %%A in (%O%\LegacyLyrion-%V%.jar) do set SIZE=%%~zA
+findstr /v "Manifest-Version" %B%\%V%\MANIFEST.MF > %O%\LegacyLyrion-%V%.jad
+echo MIDlet-Jar-Size: %SIZE%>> %O%\LegacyLyrion-%V%.jad
+echo MIDlet-Jar-URL: LegacyLyrion-%V%.jar>> %O%\LegacyLyrion-%V%.jad
+echo built %O%\LegacyLyrion-%V%.jar (%SIZE% bytes)
 goto :eof

@@ -6,7 +6,7 @@ This guide sets up three things:
 2. **[Spotty](https://github.com/michaelherger/Spotty-Plugin)**, the plugin that brings Spotify into Lyrion, and optionally **[YouTube Music for LMS](https://github.com/schmij97/lms-ytmusic)**.
 3. **LegacyLyrion A200** on a Sony Ericsson Aino, W995, C905, W705 or another A200-platform phone, which becomes a Spotify-style remote and a player in its own right.
 
-**Contents:** [What you need](#what-you-need) · [1. Lyrion](#1-install-lyrion-music-server) · [2. Spotty](#2-add-spotify-with-the-spotty-plugin) · [YouTube Music](#optional-youtube-music) · [3. MP3](#3-make-sure-lyrion-can-stream-mp3) · [4. Install the app](#4-install-the-app-on-the-phone) · [5. First start](#5-first-start) · [6. Play on the phone](#6-play-on-the-phone-itself) · [Docked mode](#docked-mode-aino) · [Standby wallpaper](#standby-wallpaper) · [Controls](#controls) · [Settings](#settings) · [Troubleshooting](#troubleshooting)
+**Contents:** [What you need](#what-you-need) · [1. Lyrion](#1-install-lyrion-music-server) · [2. Spotty](#2-add-spotify-with-the-spotty-plugin) · [YouTube Music](#optional-youtube-music) · [3. MP3](#3-make-sure-lyrion-can-stream-mp3) · [4. Install the app](#4-install-the-app-on-the-phone) · [5. First start](#5-first-start) · [6. Play on the phone](#6-play-on-the-phone-itself) · [Docked mode](#docked-mode-aino) · [Updates](#updates) · [Standby wallpaper](#standby-wallpaper) · [Controls](#controls) · [Settings](#settings) · [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -172,6 +172,10 @@ You can also dock by hand from **More → Docked mode** on any list or on Now Pl
 The Aino doesn't tell Java apps whether it is charging, so docked mode goes by position alone: sideways and still. On phones that do report the charger (`charger_state` on the `Sensors:` line in the [Diagnostics log](#diagnostics-log)), it also has to be charging, and unplugging undocks at once.
 
 **The screen light:** docked, the app keeps the display lit through the Nokia UI API (`DeviceControl`), which the Aino carries, renewing it every few seconds; undocked, the phone's own light timeout takes over again. Turn it off with *Settings → Keep the screen on when docked*. The standard MIDP call (`flashBacklight`) isn't used, because on Sony Ericsson phones it makes the screen blink.
+
+## Updates
+
+Install the **LegacyLyrion Updates** plugin on your Lyrion server and the app updates itself over your home network (these phones can't reach GitHub any more). On start it checks quietly, and *Settings → Check for updates* checks on demand. When a newer version is there, it shows what's new with *Update*, *Later* and *Skip this version*; *Update* opens the phone's installer, and your settings are kept. Without the plugin, nothing happens.
 
 ## Standby wallpaper
 

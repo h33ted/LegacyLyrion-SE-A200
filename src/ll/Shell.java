@@ -456,11 +456,34 @@ final class Shell extends Canvas {
     }
 
     protected void keyPressed(int keyCode) {
+        logKey(keyCode, "down");
         try { handleKey(keyCode, false); } catch (Throwable t) { app.fault("key " + keyCode, t); }
     }
 
     protected void keyRepeated(int keyCode) {
         try { handleKey(keyCode, true); } catch (Throwable t) { app.fault("key " + keyCode, t); }
+    }
+
+    protected void keyReleased(int keyCode) {
+        logKey(keyCode, "up");
+    }
+
+    /**
+     * Keys the app doesn't use (side media keys, volume, camera...) go to Diagnostics, to see which
+     * ones the phone passes on to Java at all.
+     */
+    private void logKey(int k, String how) {
+        if ((k >= KEY_NUM0 && k <= KEY_NUM9) || k == KEY_STAR || k == KEY_POUND || k == SOFT_LEFT_SE
+                || k == SOFT_RIGHT_SE || k == CLEAR_SE || k == SOFT_LEFT_ALT || k == SOFT_RIGHT_ALT) return;
+        int g = game(k);
+        if (g == UP || g == DOWN || g == LEFT || g == RIGHT || g == FIRE) return;
+        String n;
+        try {
+            n = getKeyName(k);
+        } catch (Throwable t) {
+            n = "?";
+        }
+        app.log("Key " + how + ": " + k + " (" + n + ")");
     }
 
     private void handleKey(int keyCode, boolean repeat) {
@@ -524,17 +547,22 @@ final class Shell extends Canvas {
     }
 
     // ------------------------------------------------------------------ touch
+    // Build.TOUCH is a compile-time constant: the A200 (keypad) build leaves all of this out.
 
     protected void pointerPressed(int px, int py) {
-        int x = ux(px, py), y = uy(px, py);
-        pressX = x;
-        pressY = y;
-        lastY = y;
-        dragging = false;
+        if (Build.TOUCH) {
+            int x = ux(px, py), y = uy(px, py);
+            pressX = x;
+            pressY = y;
+            lastY = y;
+            dragging = false;
+        }
     }
 
     protected void pointerDragged(int x, int y) {
-        try { dragTo(ux(x, y), uy(x, y)); } catch (Throwable t) { app.fault("drag", t); }
+        if (Build.TOUCH) {
+            try { dragTo(ux(x, y), uy(x, y)); } catch (Throwable t) { app.fault("drag", t); }
+        }
     }
 
     private void dragTo(int x, int y) {
@@ -549,7 +577,9 @@ final class Shell extends Canvas {
     }
 
     protected void pointerReleased(int x, int y) {
-        try { release(ux(x, y), uy(x, y)); } catch (Throwable t) { app.fault("tap", t); }
+        if (Build.TOUCH) {
+            try { release(ux(x, y), uy(x, y)); } catch (Throwable t) { app.fault("tap", t); }
+        }
     }
 
     private void release(int x, int y) {

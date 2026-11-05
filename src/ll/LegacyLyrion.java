@@ -50,6 +50,8 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     boolean keepLit = true;             // docked: keep the screen on (Nokia DeviceControl)
     int nightMode = Docking.ASK;        // docked between 23:00 and 07:00: ask, always, or never
     int sunriseMinutes = 10;            // docked: the screen brightens over this long before a Lyrion alarm
+    int skipUpdate;                     // versionCode the user chose to skip
+    Updater updater;
     Docking docking;                    // only on the Aino
     private ChoiceGroup fRot, fDock, fLit, fNight;
     private TextField fDockWait, fSunrise;
@@ -77,8 +79,17 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
             shell.setDockWanted(dockMode != Docking.OFF);
             docking.start();
         }
+        updater = new Updater(this);
         if (lms.host.length() == 0) showSettings(true);
-        else showHome();
+        else {
+            showHome();
+            new Thread(new Runnable() {                  // a quiet look for updates once the home menu is up
+                public void run() {
+                    try { Thread.sleep(6000); } catch (InterruptedException e) {}
+                    updater.check(false);
+                }
+            }).start();
+        }
         startMiniPoller();
     }
 
@@ -129,6 +140,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                 if (f.length > 10) keepLit = !"0".equals(f[10]);
                 if (f.length > 11 && f[11].length() == 1) nightMode = f[11].charAt(0) - '0';
                 if (f.length > 12) sunriseMinutes = minutes(f[12], sunriseMinutes);
+                if (f.length > 13) skipUpdate = Json.toInt(f[13], 0);
             }
             rs.closeRecordStore();
         } catch (Exception ignored) {}
@@ -147,7 +159,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         try {
             String v = lms.host + "\n" + lms.port + "\n" + player + "\n" + phoneMac + "\n" + (phonePlays ? "1" : "0")
                     + "\n" + (phoneMode == Slim.MODE_DIRECT ? "1" : "0") + "\n" + rotMode + "\n" + (sourceSaved ? String.valueOf(source) : "")
-                    + "\n" + dockMode + "\n" + dockDelay + "\n" + (keepLit ? "1" : "0") + "\n" + nightMode + "\n" + sunriseMinutes;
+                    + "\n" + dockMode + "\n" + dockDelay + "\n" + (keepLit ? "1" : "0") + "\n" + nightMode + "\n" + sunriseMinutes + "\n" + skipUpdate;
             byte[] b = v.getBytes("UTF-8");
             RecordStore rs = RecordStore.openRecordStore("legacylyrion", true);
             if (rs.getNumRecords() == 0) rs.addRecord(b, 0, b.length);
@@ -222,6 +234,8 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     private ChoiceGroup fPhone, fMode;
     private Form logForm;
     private final Command cLog = new Command("Diagnostics", Command.SCREEN, 3);
+    private final Command cSaveLog = new Command("Save to file", Command.SCREEN, 1);
+    private final Command cUpdates = new Command("Check for updates", Command.SCREEN, 4);
     private final Command cSave = new Command("Save", Command.OK, 1);
     private final Command cBack = new Command("Back", Command.BACK, 2);
     private final Command cSearch = new Command("Search", Command.OK, 1);
@@ -268,6 +282,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         settingsForm.append(new StringItem(null, "\n" + credit()));
         settingsForm.addCommand(cSave);
         settingsForm.addCommand(cLog);
+        settingsForm.addCommand(cUpdates);
         if (!first) settingsForm.addCommand(cBack);
         settingsForm.setCommandListener(this);
         display.setCurrent(settingsForm);
@@ -298,11 +313,17 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
 
     public void commandAction(Command c, Displayable d) {
         if (d == logForm) {
-            display.setCurrent(shell);
+            if (c == cSaveLog) saveLog();
+            else display.setCurrent(shell);
             return;
         }
         if (c == cLog) {
             showLog();
+            return;
+        }
+        if (c == cUpdates) {
+            display.setCurrent(shell);
+            updater.check(true);
             return;
         }
         if (d == settingsForm) {
@@ -701,6 +722,93 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         });
     }
 
+    /**
+     * "Add to library" for the playing track. Lyrion's track menu for it (the one a Squeezebox Touch
+     * shows under More) carries the plugins' own entries, e.g. Spotty's save-to-library; this finds
+     * the one that adds to the library, looking one level into a plugin's submenu, and runs it.
+     */
+    void addToLibrary() {
+        bg(new Runnable() {
+            public void run() {
+                String[] cmd = null;
+                try {
+                    Hashtable st = lms.call(player, new String[]{"status", "-", "1", "tags:u"});
+                    String idx = Json.str(st, "playlist_cur_index");
+                    if (idx == null) {
+                        shell.toast("Nothing playing");
+                        return;
+                    }
+                    Hashtable r = lms.call(player, new String[]{"contextmenu", "0", "100", "menu:track",
+                            "context:playlist", "playlist_index:" + idx});
+                    Object[] hit = libraryEntry(r, true);
+                    if (hit == null) {
+                        r = lms.call(player, new String[]{"trackinfo", "items", "0", "100", "menu:1", "playlist_index:" + idx});
+                        hit = libraryEntry(r, true);
+                    }
+                    if (hit == null) {
+                        shell.toast("No library option for this track");
+                        return;
+                    }
+                    Item it = (Item) hit[0];
+                    Hashtable base = (Hashtable) hit[1];
+                    cmd = it.command(base, "do", 0);
+                    if (cmd == null) cmd = it.command(base, "go", 0);
+                    if (cmd == null) {
+                        shell.toast("Not available");
+                        return;
+                    }
+                    Hashtable res = lms.call(player, cmd);
+                    Vector v = Lms.items(res);                  // some plugins answer with a one-line confirmation
+                    String said = v.size() == 1 ? ((Item) v.elementAt(0)).title : null;
+                    boolean lib = "library".equals(hit[2]);
+                    log("Library: " + it.title + (said != null ? " -> " + said : ""));
+                    shell.toast(said != null ? said : lib ? "Album added to your Spotify library" : "Added to Lyrion favourites");
+                } catch (Exception e) {
+                    if (cmd != null) failed(cmd, e);
+                    else {
+                        log("Library: " + e);
+                        shell.toast("Failed: " + e.getMessage());
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * {Item, base, kind} of what "add to library" can run in a track menu, or null. What the plugins
+     * really offer (checked in their source): Spotty has no "save song", only "Add album to library"
+     * inside the "On Spotify: <album>" page; YouTube Music for LMS has nothing; Lyrion's own
+     * "Add to Favorites" is in every track menu and is the fallback.
+     */
+    private Object[] libraryEntry(Hashtable r, boolean deeper) throws Exception {
+        Vector v = Lms.items(r);
+        Hashtable base = Json.obj(r, "base");
+        StringBuffer seen = new StringBuffer();
+        Object[] fav = null;
+        for (int k = 0; k < v.size(); k++) {
+            Item it = (Item) v.elementAt(k);
+            String t = it.title.toLowerCase();
+            seen.append(k > 0 ? " | " : "").append(it.title);
+            if (t.indexOf("add") >= 0 && t.indexOf("library") >= 0) return new Object[]{it, base, "library"};
+            if (fav == null && t.indexOf("add") >= 0 && (t.indexOf("favorite") >= 0 || t.indexOf("favourite") >= 0)) {
+                fav = new Object[]{it, base, "favourites"};
+            }
+        }
+        if (deeper) {                                   // Spotty: the album page, which comes after the artists
+            for (int k = v.size() - 1; k >= 0; k--) {
+                Item it = (Item) v.elementAt(k);
+                if (!it.title.toLowerCase().startsWith("on spotify")) continue;
+                String[] sub = it.command(base, "go", 0);
+                if (sub == null) continue;
+                Object[] hit = libraryEntry(lms.call(player, sub), false);
+                if (hit != null && "library".equals(hit[2])) return hit;
+                break;                                  // only the last one (the album); artist pages are slow
+            }
+        }
+        if (fav == null && deeper) log("Library: track menu has " + (seen.length() == 0 ? "nothing" : seen.toString()));
+        return fav;
+    }
+
     /** A command that didn't work: shown, and written to Diagnostics with the command itself. */
     private void failed(String[] cmd, Exception e) {
         StringBuffer b = new StringBuffer();
@@ -951,9 +1059,57 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         }
         logForm.append(new StringItem(credit() + "\n", null));
         logForm.append(new StringItem("Player: " + phoneName() + " / " + phoneMac + "\n", text));
+        logForm.addCommand(cSaveLog);
         logForm.addCommand(cBack);
         logForm.setCommandListener(this);
         display.setCurrent(logForm);
+    }
+
+    /** Diagnostics as a .txt on the memory card (or phone memory), with some facts about the phone. */
+    private void saveLog() {
+        new Thread(new Runnable() {
+            public void run() {
+                String msg;
+                try {
+                    Class.forName("javax.microedition.io.file.FileConnection");
+                    FileAccess fa = (FileAccess) Class.forName("ll.JsrFiles").newInstance();
+                    java.util.Calendar c = java.util.Calendar.getInstance();
+                    String stamp = c.get(java.util.Calendar.YEAR) + two(c.get(java.util.Calendar.MONTH) + 1)
+                            + two(c.get(java.util.Calendar.DAY_OF_MONTH)) + "-" + two(c.get(java.util.Calendar.HOUR_OF_DAY))
+                            + two(c.get(java.util.Calendar.MINUTE));
+                    Runtime rt = Runtime.getRuntime();
+                    StringBuffer b = new StringBuffer();
+                    b.append(credit()).append("\n");
+                    b.append("Phone: ").append(System.getProperty("microedition.platform")).append("\n");
+                    b.append("Player: ").append(phoneName()).append(" / ").append(phoneMac).append("\n");
+                    b.append("Server: ").append(lms.host).append(':').append(lms.port).append("\n");
+                    b.append("Memory: ").append(rt.freeMemory() / 1024).append(" KB free of ")
+                            .append(rt.totalMemory() / 1024).append(" KB\n");
+                    b.append("Screen: ").append(shell.getWidth()).append('x').append(shell.getHeight()).append("\n\n");
+                    synchronized (logBuf) {
+                        b.append(logBuf.toString());
+                    }
+                    String text = b.toString();
+                    StringBuffer out = new StringBuffer();      // Windows line ends, so Notepad shows it right
+                    for (int k = 0; k < text.length(); k++) {
+                        char ch = text.charAt(k);
+                        if (ch == '\n') out.append('\r');
+                        out.append(ch);
+                    }
+                    String url = fa.save("LegacyLyrion-diagnostics-" + stamp + ".txt", out.toString().getBytes("UTF-8"));
+                    msg = "Saved to " + url.substring(8);
+                    log(msg);
+                } catch (Throwable t) {
+                    msg = "Couldn't save: " + t;
+                    log(msg);
+                }
+                try {
+                    Alert a = new Alert("Diagnostics", msg, null, AlertType.INFO);
+                    a.setTimeout(Alert.FOREVER);
+                    display.setCurrent(a, logForm);
+                } catch (Throwable ignored) {}
+            }
+        }).start();
     }
 
     // ------------------------------------------------------------------ util

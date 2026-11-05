@@ -70,12 +70,12 @@ Screenshots are from MicroEmulator 2.0.4 at the phones' native resolutions.
 
 ## Supported phones
 
-One jar runs on every A200-platform phone (Java Platform 8.4 / 8.5); the layout follows the screen. It comes in two labelled copies so it is obvious which one to pick:
+Two builds from the same source, both in every release:
 
 | Download | For |
 |---|---|
-| `LegacyLyrion-Aino.jar` + `.jad` | Sony Ericsson **Aino** (U10i), 240x432, touch and keypad |
-| `LegacyLyrion-A200.jar` + `.jad` | The **240x320** keypad phones of the same generation |
+| `LegacyLyrion-Aino.jar` + `.jad` | Sony Ericsson **Aino** (U10i), 240x432: touch and keypad, docked mode, plus the standby wallpaper (`LegacyLyrion-Standby.jar`) |
+| `LegacyLyrion-A200.jar` + `.jad` | The **240x320** keypad phones of the same generation: keypad only, smaller (no touch code, no standby wallpaper) |
 
 | Phone | Screen | Wi-Fi | Tested |
 |---|---|---|---|
@@ -106,7 +106,7 @@ You need **JDK 11 or newer** on the PATH, and nothing else. On the first build t
 - [ECJ 4.6.1](https://repo1.maven.org/maven2/org/eclipse/jdt/core/compiler/ecj/4.6.1/), the Eclipse compiler, whose `cldc1.1` target writes preverified, Java 1.1-era class files the phones accept;
 - [MicroEmulator's CLDC 1.1](https://repo1.maven.org/maven2/org/microemu/cldcapi11/2.0.4/) and [MIDP 2.0](https://repo1.maven.org/maven2/org/microemu/midpapi20/2.0.4/) API stubs to compile against.
 
-The output is `dist/LegacyLyrion-Aino.jar` / `.jad` and `dist/LegacyLyrion-A200.jar` / `.jad`. Set `VER=0.7.0` to override the version, or `LL_SERVER=192.168.1.20:9000` to build a test copy into `dist-test/` with the server address preset.
+The jars land in `dist/<version>/`: `LegacyLyrion-Aino`, `LegacyLyrion-A200` and `LegacyLyrion-Standby`, each with its `.jad`. Every build compiles into its own `build/<version>-<date-time>/` folder and nothing is deleted, so clear out `build/` now and then. Set `VER=0.9.0` to override the version, or `LL_SERVER=192.168.1.20:9000` to build a test copy into `dist-test/<version>/` with the server address preset.
 
 To try it on a PC, run the Aino or A200 `.jad` in [MicroEmulator 2.0.4](https://github.com/barteo/microemu) and pick a 240x432 or 240x320 device skin.
 

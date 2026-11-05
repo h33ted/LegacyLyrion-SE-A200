@@ -1,6 +1,7 @@
 package ll;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Enumeration;
 import java.util.Vector;
 
@@ -34,6 +35,46 @@ public final class JsrFiles implements FileAccess {
         }
         for (int i = 0; i < pics.size(); i++) dirs.addElement(pics.elementAt(i));
         return dirs;
+    }
+
+    public String save(String name, byte[] data) throws Exception {
+        String dir = folder();
+        FileConnection fc = (FileConnection) Connector.open(dir + name, Connector.READ_WRITE);
+        try {
+            if (!fc.exists()) fc.create();
+            OutputStream o = fc.openOutputStream();
+            try {
+                o.write(data);
+            } finally {
+                o.close();
+            }
+        } finally {
+            fc.close();
+        }
+        return dir + name;
+    }
+
+    /** The memory card if there is one (any root but c:/), else the first root; its Other folder if present. */
+    private String folder() throws Exception {
+        Vector r = roots();
+        if (r.isEmpty()) throw new Exception("no memory found");
+        String root = (String) r.elementAt(0);
+        for (int i = 0; i < r.size(); i++) {
+            String u = (String) r.elementAt(i);
+            if (!u.toLowerCase().startsWith("file:///c:")) {
+                root = u;
+                break;
+            }
+        }
+        try {
+            FileConnection d = (FileConnection) Connector.open(root + "Other/", Connector.READ);
+            try {
+                if (d.exists() && d.isDirectory()) return root + "Other/";
+            } finally {
+                d.close();
+            }
+        } catch (Exception ignored) {}
+        return root;
     }
 
     public Image load(String url) throws Exception {
