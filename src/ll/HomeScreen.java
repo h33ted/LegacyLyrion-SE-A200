@@ -22,6 +22,16 @@ final class HomeScreen extends Screen implements Runnable {
         final String spotty;            // Spotty top-level menu to take artwork from (P_THUMBS)
         Vector thumbs;                  // Images, once loaded
         boolean loading;
+        String fit;                     // label shortened for fitW, so it isn't re-measured every frame
+        int fitW = -1;
+
+        String fitted(javax.microedition.lcdui.Font f, int w) {
+            if (w != fitW) {
+                fit = Style.fit(label, f, w);
+                fitW = w;
+            }
+            return fit;
+        }
 
         Entry(String label, int glyph, int action, int preview, String spotty) {
             this.label = label;
@@ -205,6 +215,7 @@ final class HomeScreen extends Screen implements Runnable {
         int P = pitch();
         int iconX = railX + 34, textX = railX + 58;
         boxY = h * 43 / 100 - P / 2 + anim;
+        long t0 = System.currentTimeMillis();
 
         // rail
         g.setColor(0x3a3a3a);
@@ -218,6 +229,7 @@ final class HomeScreen extends Screen implements Runnable {
             railIcon(g, glyph, railX / 2, noteY + k * (P + 6), section == rail[k]);
         }
 
+        long t1 = System.currentTimeMillis();
         Entry f = n > 0 ? (Entry) entries.elementAt(focus) : null;
         int bh = f == null ? 0 : P + previewH(f);
 
@@ -234,11 +246,25 @@ final class HomeScreen extends Screen implements Runnable {
             Style.glyph(g, e.glyph, iconX, top + P / 2, 24, Style.ICON);
             g.setFont(Style.MENU);
             g.setColor(Style.TEXT_DIM);
-            g.drawString(Style.fit(e.label, Style.MENU, w - textX - 8), textX, top + (P - Style.MENU.getHeight()) / 2,
+            g.drawString(e.fitted(Style.MENU, w - textX - 8), textX, top + (P - Style.MENU.getHeight()) / 2,
                     Graphics.TOP | Graphics.LEFT);
         }
+        long t2 = System.currentTimeMillis();
         if (f != null) paintFocus(g, f, w, iconX, textX, P, bh);
+        long t3 = System.currentTimeMillis();
+        partRail += t1 - t0;
+        partEntries += t2 - t1;
+        partFocus += t3 - t2;
+        if (++partFrames >= 60) {                       // where the home screen's time goes, for Diagnostics
+            app.log("Home parts: rail " + partRail / partFrames + " ms, entries " + partEntries / partFrames
+                    + " ms, focus box " + partFocus / partFrames + " ms");
+            partFrames = 0;
+            partRail = partEntries = partFocus = 0;
+        }
     }
+
+    private int partFrames;
+    private long partRail, partEntries, partFocus;
 
     private void railIcon(Graphics g, int glyph, int x, int y, boolean on) {
         if (on) {                                   // small orange tick on the rail marks the section

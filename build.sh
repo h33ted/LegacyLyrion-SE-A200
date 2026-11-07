@@ -17,7 +17,7 @@
 # so no separate preverify step is required.
 set -e
 cd "$(dirname "$0")"
-VER=${VER:-0.9.2}
+VER=${VER:-0.9.3}
 # Test builds: LL_SERVER=192.168.1.20:9000 sh build.sh  -> dist-test/ with the server preset
 OUT=dist
 M2=https://repo1.maven.org/maven2

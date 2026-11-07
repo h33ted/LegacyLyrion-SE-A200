@@ -284,7 +284,27 @@ final class Style {
         if (img != null) g.drawImage(img, cx, cy, Graphics.VCENTER | Graphics.HCENTER);
     }
 
+    // A small direct-mapped cache in front of the Hashtable: a hit allocates nothing (the
+    // Hashtable's String key made garbage on every drawn icon, and garbage collection stutters).
+    private static final int FAST = 64;
+    private static final int[] fastKind = new int[FAST], fastSize = new int[FAST], fastColor = new int[FAST];
+    private static final Image[] fastImg = new Image[FAST];
+
     static Image icon(int kind, int s, int color) {
+        int slot = ((kind * 31 + s) * 31 + color) & (FAST - 1);
+        Image hit = fastImg[slot];
+        if (hit != null && fastKind[slot] == kind && fastSize[slot] == s && fastColor[slot] == color) return hit;
+        Image img = slowIcon(kind, s, color);
+        if (img != null) {
+            fastKind[slot] = kind;
+            fastSize[slot] = s;
+            fastColor[slot] = color;
+            fastImg[slot] = img;
+        }
+        return img;
+    }
+
+    private static Image slowIcon(int kind, int s, int color) {
         String key = kind + "/" + s + "/" + color;
         Image img = (Image) icons.get(key);
         if (img != null) return img;

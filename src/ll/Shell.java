@@ -314,7 +314,7 @@ final class Shell extends Canvas {
 
     // paint timing for Diagnostics: average and worst per screen, logged every 60 frames
     private int frames;
-    private long frameSum, frameWorst;
+    private long frameSum, frameWorst, bgSum;
     private String frameScreen = "";
 
     private void timed(long t0) {
@@ -326,16 +326,18 @@ final class Shell extends Canvas {
             frames = 0;
             frameSum = 0;
             frameWorst = 0;
+            bgSum = 0;
         }
         frames++;
         frameSum += d;
         if (d > frameWorst) frameWorst = d;
         if (frames >= 60) {
             app.log("Paint " + name.substring(name.lastIndexOf('.') + 1) + (rot != 0 ? " (turned)" : "")
-                    + ": avg " + (frameSum / frames) + " ms, worst " + frameWorst + " ms");
+                    + ": avg " + (frameSum / frames) + " ms (background " + (bgSum / frames) + "), worst " + frameWorst + " ms");
             frames = 0;
             frameSum = 0;
             frameWorst = 0;
+            bgSum = 0;
         }
     }
 
@@ -367,7 +369,9 @@ final class Shell extends Canvas {
         int w = lw(), h = lh();
         Screen s = top();
         g.setClip(0, 0, w, h);
+        long tb = System.currentTimeMillis();
         Style.background(g, w, h);
+        bgSum += System.currentTimeMillis() - tb;
         if (s == null) return;
 
         int sh = softH(), mh = miniH();
