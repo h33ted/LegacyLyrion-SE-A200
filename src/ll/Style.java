@@ -117,8 +117,10 @@ final class Style {
         g.drawRoundRect(x, y, w - 1, h - 1, 6, 6);
     }
 
-    private static Image box;
-    private static String boxKey;
+    private static final int SLOTS = 4;                 // search, artwork, text and plain entries
+    private static final Image[] boxImg = new Image[SLOTS];
+    private static final int[][] boxKey = new int[SLOTS][];
+    private static int boxNext;
 
     static void focusBox(Graphics g, int x, int y, int w, int h) {
         focusBox(g, x, y, w, h, 0, 0, 0, 0);
@@ -147,15 +149,34 @@ final class Style {
      * their alpha, so the glass is worked out here from the background pixels and drawn solid.
      */
     static void focusBox(Graphics g, int x, int y, int w, int h, int fx, int fy, int fw, int fh) {
+        focusBox(g, x, y, w, h, fx, fy, fw, fh, y);
+    }
+
+    /**
+     * As above, drawn at y but with the glass worked out as if the box were at rest at y = at, so
+     * a sliding box keeps its glass. The background glow changes slowly, so the difference doesn't
+     * show while it moves. The last few boxes are kept, compared without allocating anything.
+     */
+    static void focusBox(Graphics g, int x, int y, int w, int h, int fx, int fy, int fw, int fh, int at) {
         if (w <= 4 || h <= 4) return;
         Shell s = Shell.instance;
         int sw = s.lw(), sh = s.lh();
-        String k = x + "," + y + "," + w + "," + h + "," + fx + "," + fy + "," + fw + "," + fh + "," + sw + "x" + sh;
-        if (!k.equals(boxKey)) {
-            box = glassBox(x, y, w, h, fx, fy, fw, fh, sw, sh);
-            boxKey = k;
+        int fdx = fw > 0 ? fx - x : 0, fdy = fw > 0 ? fy - y : 0;
+        if (fw <= 0) fw = fh = 0;
+        for (int k = 0; k < SLOTS; k++) {
+            int[] c = boxKey[k];
+            if (c != null && c[0] == x && c[1] == at && c[2] == w && c[3] == h && c[4] == fdx && c[5] == fdy
+                    && c[6] == fw && c[7] == fh && c[8] == sw && c[9] == sh) {
+                g.drawImage(boxImg[k], x, y, Graphics.TOP | Graphics.LEFT);
+                return;
+            }
         }
-        g.drawImage(box, x, y, Graphics.TOP | Graphics.LEFT);
+        Image img = glassBox(x, at, w, h, x + fdx, at + fdy, fw, fh, sw, sh);
+        int k = boxNext;
+        boxNext = (boxNext + 1) % SLOTS;
+        boxImg[k] = img;
+        boxKey[k] = new int[]{x, at, w, h, fdx, fdy, fw, fh, sw, sh};
+        g.drawImage(img, x, y, Graphics.TOP | Graphics.LEFT);
     }
 
     private static Image glassBox(int x, int y, int w, int h, int fx, int fy, int fw, int fh, int sw, int sh) {

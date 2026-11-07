@@ -313,9 +313,9 @@ final class HomeScreen extends Screen implements Runnable {
         int py = boxY + P - 2, px = bx + 8, pw = bw - 16;
         int fh = Style.ROW.getHeight() + 8;
         boolean search = e.preview == P_SEARCH;
-        if (anim != 0) Style.focusBoxMoving(g, bx, boxY, bw, bh, px, py, search ? pw : 0, fh);   // sliding: frame only
-        else if (search) Style.focusBox(g, bx, boxY, bw, bh, px, py, pw, fh);
-        else Style.focusBox(g, bx, boxY, bw, bh);
+        // the glass is worked out for where the box comes to rest and slides along with it, so it
+        // never pops in; the boxes for each kind of entry stay cached, so sliding costs one drawImage
+        Style.focusBox(g, bx, boxY, bw, bh, px, py, search ? pw : 0, fh, boxY - anim);
         Style.glyph(g, e.glyph, iconX - 2, boxY + P / 2, 32, Style.ICON_FOCUS);
         g.setFont(Style.MENU_BOLD);
         g.setColor(Style.TEXT);

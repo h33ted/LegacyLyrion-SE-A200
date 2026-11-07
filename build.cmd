@@ -6,7 +6,7 @@ rem folder, build\<version>-<date-time>\. The newest jars are also copied to dis
 rem Needs JDK 11 or newer on PATH; the jars in lib\ are downloaded on the first build (curl ships with Windows 10+).
 setlocal
 cd /d "%~dp0"
-if "%VER%"=="" set VER=0.9.4
+if "%VER%"=="" set VER=0.9.5
 if not exist lib mkdir lib
 set M2=https://repo1.maven.org/maven2
 if not exist lib\ecj-4.6.1.jar curl.exe -fsSL -o lib\ecj-4.6.1.jar %M2%/org/eclipse/jdt/core/compiler/ecj/4.6.1/ecj-4.6.1.jar || exit /b 1
