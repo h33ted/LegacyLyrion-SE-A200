@@ -312,11 +312,40 @@ final class Shell extends Canvas {
 
     // ------------------------------------------------------------------ painting
 
+    // paint timing for Diagnostics: average and worst per screen, logged every 60 frames
+    private int frames;
+    private long frameSum, frameWorst;
+    private String frameScreen = "";
+
+    private void timed(long t0) {
+        long d = System.currentTimeMillis() - t0;
+        Screen s = top();
+        String name = s == null ? "" : s.getClass().getName();
+        if (!name.equals(frameScreen)) {
+            frameScreen = name;
+            frames = 0;
+            frameSum = 0;
+            frameWorst = 0;
+        }
+        frames++;
+        frameSum += d;
+        if (d > frameWorst) frameWorst = d;
+        if (frames >= 60) {
+            app.log("Paint " + name.substring(name.lastIndexOf('.') + 1) + (rot != 0 ? " (turned)" : "")
+                    + ": avg " + (frameSum / frames) + " ms, worst " + frameWorst + " ms");
+            frames = 0;
+            frameSum = 0;
+            frameWorst = 0;
+        }
+    }
+
     protected void paint(Graphics g) {
+        long t0 = System.currentTimeMillis();
         try {
             int r = rot;
             if (r == 0) {
                 draw(g);
+                timed(t0);
                 return;
             }
             int w = getWidth(), h = getHeight();
@@ -328,6 +357,7 @@ final class Shell extends Canvas {
             draw(f.getGraphics());
             g.setClip(0, 0, w, h);
             g.drawRegion(f, 0, 0, h, w, r == 1 ? Sprite.TRANS_ROT90 : Sprite.TRANS_ROT270, 0, 0, Graphics.TOP | Graphics.LEFT);
+            timed(t0);
         } catch (Throwable t) {
             app.fault("drawing " + (top() == null ? "" : top().title), t);
         }

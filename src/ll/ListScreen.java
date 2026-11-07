@@ -15,6 +15,8 @@ class ListScreen extends Screen {
         int glyph;
         int action;
         Item item;
+        int fitW = -1;                  // the shortened texts below were made for this width
+        String fitTitle, fitSub;
 
         Row(String title, String sub, int glyph, int action, Item item) {
             this.title = title == null ? "" : title;
@@ -36,11 +38,19 @@ class ListScreen extends Screen {
         super(app, title);
     }
 
-    /** Rows are taller when any of them has a second line (artist, description). */
+    private Vector twoFor;
+    private boolean twoVal;
+
+    /** Rows are taller when any of them has a second line (artist, description); worked out once per list. */
     private boolean twoLine() {
         Vector rs = rows;
-        for (int k = 0; k < rs.size(); k++) if (((Row) rs.elementAt(k)).sub.length() > 0) return true;
-        return false;
+        if (rs != twoFor) {
+            boolean t = false;
+            for (int k = 0; k < rs.size() && !t; k++) t = ((Row) rs.elementAt(k)).sub.length() > 0;
+            twoVal = t;
+            twoFor = rs;
+        }
+        return twoVal;
     }
 
     int rowH() {
@@ -92,11 +102,16 @@ class ListScreen extends Screen {
             g.setFont(Style.ROW);
             g.setColor(hi ? Style.FOCUS : Style.TEXT_DIM);
             int ty = two ? y + 5 : y + (rh - Style.ROW.getHeight()) / 2;
-            g.drawString(Style.fit(r.title, Style.ROW, tw), tx, ty, Graphics.TOP | Graphics.LEFT);
+            if (r.fitW != tw) {                         // shortened once, not on every frame of a scroll
+                r.fitTitle = Style.fit(r.title, Style.ROW, tw);
+                r.fitSub = r.sub.length() > 0 ? Style.fit(r.sub, Style.SMALL, tw) : "";
+                r.fitW = tw;
+            }
+            g.drawString(r.fitTitle, tx, ty, Graphics.TOP | Graphics.LEFT);
             if (two && r.sub.length() > 0) {
                 g.setFont(Style.SMALL);
                 g.setColor(hi ? Style.FOCUS_SUB : Style.TEXT_FAINT);
-                g.drawString(Style.fit(r.sub, Style.SMALL, tw), tx, ty + Style.ROW.getHeight(), Graphics.TOP | Graphics.LEFT);
+                g.drawString(r.fitSub, tx, ty + Style.ROW.getHeight(), Graphics.TOP | Graphics.LEFT);
             }
         }
         // scroll thumb

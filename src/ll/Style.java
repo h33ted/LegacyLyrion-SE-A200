@@ -125,6 +125,22 @@ final class Style {
     }
 
     /**
+     * The focus box while it slides: just the frame and the field outline, so moving costs nothing;
+     * the computed glass fills in once it stops.
+     */
+    static void focusBoxMoving(Graphics g, int x, int y, int w, int h, int fx, int fy, int fw, int fh) {
+        if (w <= 4 || h <= 4) return;
+        g.setColor(0x8c8c8c);
+        g.drawRect(x, y, w - 1, h - 1);
+        g.setColor(0x5a5a5a);
+        g.drawLine(x + 1, y + 1, x + w - 2, y + 1);
+        if (fw > 0) {
+            g.setColor(0x6a6a6a);
+            g.drawRect(fx, fy, fw - 1, fh - 1);
+        }
+    }
+
+    /**
      * The focused entry of the home menu, as in Sony Ericsson's own media apps: light glass the
      * background glow shows through (brighter in the upper half), a thin light-grey frame, and
      * optionally a dark see-through text field inside (fw > 0). The Aino draws images without
@@ -240,9 +256,13 @@ final class Style {
         if (f.stringWidth(s) <= w) return s;
         String dots = "...";
         int dw = f.stringWidth(dots);
-        int n = s.length();
-        while (n > 0 && f.substringWidth(s, 0, n) + dw > w) n--;
-        return s.substring(0, n) + dots;
+        int lo = 0, hi = s.length();                    // binary search: a few measurements, not one per letter
+        while (lo < hi) {
+            int mid = (lo + hi + 1) / 2;
+            if (f.substringWidth(s, 0, mid) + dw <= w) lo = mid;
+            else hi = mid - 1;
+        }
+        return s.substring(0, lo) + dots;
     }
 
     // ------------------------------------------------------------------ icons
