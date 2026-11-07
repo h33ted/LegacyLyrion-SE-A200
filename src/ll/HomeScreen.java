@@ -26,6 +26,17 @@ final class HomeScreen extends Screen implements Runnable {
         String fit;                     // label shortened for fitW, so it isn't re-measured every frame
         int fitW = -1;
 
+        String fitB;                    // the same in bold, for the focus box
+        int fitBW = -1;
+
+        String fittedBold(int w) {
+            if (w != fitBW) {
+                fitB = Style.fit(label, Style.MENU_BOLD, w);
+                fitBW = w;
+            }
+            return fitB;
+        }
+
         String fitted(javax.microedition.lcdui.Font f, int w) {
             if (w != fitW) {
                 fit = Style.fit(label, f, w);
@@ -406,7 +417,7 @@ final class HomeScreen extends Screen implements Runnable {
         Style.glyph(g, e.glyph, iconX - 2, boxY + P / 2, 32, Style.ICON_FOCUS);
         g.setFont(Style.MENU_BOLD);
         g.setColor(Style.TEXT);
-        g.drawString(Style.fit(e.label, Style.MENU_BOLD, w - textX - 10), textX, boxY + (P - Style.MENU_BOLD.getHeight()) / 2,
+        g.drawString(e.fittedBold(w - textX - 10), textX, boxY + (P - Style.MENU_BOLD.getHeight()) / 2,
                 Graphics.TOP | Graphics.LEFT);
 
         if (e.preview == P_SEARCH) {                    // the field itself is drawn into the glass box
@@ -459,9 +470,18 @@ final class HomeScreen extends Screen implements Runnable {
         } else if (e.preview == P_TEXT) {
             g.setFont(Style.SMALL);
             g.setColor(Style.TEXT_DIM);
-            g.drawString(Style.fit(previewText(e), Style.SMALL, pw), px, py + 3, Graphics.TOP | Graphics.LEFT);
+            String t = previewText(e);
+            if (!t.equals(prevSrc) || pw != prevW) {        // shortened only when the text changes
+                prevSrc = t;
+                prevW = pw;
+                prevFit = Style.fit(t, Style.SMALL, pw);
+            }
+            g.drawString(prevFit, px, py + 3, Graphics.TOP | Graphics.LEFT);
         }
     }
+
+    private String prevSrc, prevFit;
+    private int prevW = -1;
 
     private String previewText(Entry e) {
         switch (e.action) {

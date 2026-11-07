@@ -57,7 +57,7 @@ final class Style {
     static synchronized Image glowFor(int w, int h) {
         if (glowA != null && glowA.getWidth() == w && glowA.getHeight() == h) return glowA;
         if (glowB != null && glowB.getWidth() == w && glowB.getHeight() == h) return glowB;
-        Image img = makeGlow(w, h);
+        Image img = screenFormat(makeGlow(w, h));
         glowB = glowA;
         glowA = img;
         return img;
@@ -67,6 +67,20 @@ final class Style {
     static void prewarm(int w, int h) {
         glowFor(h, w);
         glowFor(w, h);
+    }
+
+    /**
+     * An opaque copy of an RGB image in the screen's own pixel format (a mutable image), which
+     * the phone draws much faster than an RGB array image; falls back to the original.
+     */
+    static Image screenFormat(Image src) {
+        try {
+            Image m = Image.createImage(src.getWidth(), src.getHeight());
+            m.getGraphics().drawImage(src, 0, 0, Graphics.TOP | Graphics.LEFT);
+            return m;
+        } catch (Throwable t) {
+            return src;
+        }
     }
 
     private static Image makeGlow(int w, int h) {
@@ -171,7 +185,7 @@ final class Style {
                 return;
             }
         }
-        Image img = glassBox(x, at, w, h, x + fdx, at + fdy, fw, fh, sw, sh);
+        Image img = screenFormat(glassBox(x, at, w, h, x + fdx, at + fdy, fw, fh, sw, sh));
         int k = boxNext;
         boxNext = (boxNext + 1) % SLOTS;
         boxImg[k] = img;
@@ -252,7 +266,7 @@ final class Style {
         Shell s = Shell.instance;
         int sw = s.lw(), sh = s.lh();
         if (halo == null || haloX != cx || haloY != cy || haloR != r || haloA != strength || haloW != sw || haloH != sh) {
-            halo = makeHalo(cx, cy, r, strength, sw, sh);
+            halo = screenFormat(makeHalo(cx, cy, r, strength, sw, sh));
             haloX = cx;
             haloY = cy;
             haloR = r;
