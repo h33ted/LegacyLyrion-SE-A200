@@ -20,6 +20,7 @@ final class HomeScreen extends Screen implements Runnable {
         final String label;
         final int glyph, action, preview;
         final String spotty;            // Spotty top-level menu to take artwork from (P_THUMBS)
+        int sec;                        // SPOTIFY, YOUTUBE or LOCAL
         Vector thumbs;                  // Images, once loaded
         boolean loading;
         String fit;                     // label shortened for fitW, so it isn't re-measured every frame
@@ -144,7 +145,9 @@ final class HomeScreen extends Screen implements Runnable {
     }
 
     void add(int sec, String label, int glyph, int action, int preview, String param) {
-        sections[sec].addElement(new Entry(label, glyph, action, preview, param));
+        Entry e = new Entry(label, glyph, action, preview, param);
+        e.sec = sec;
+        sections[sec].addElement(e);
     }
 
     /** Switches between the Spotify and the local-library menu (rail icons, or left/right). */
@@ -290,7 +293,90 @@ final class HomeScreen extends Screen implements Runnable {
                 e.loading = false;
             }
         }
+        artReady = false;
         app.shell.repaint();
+        LegacyLyrion.bg(new Runnable() {
+            public void run() {
+                prepareArt();
+            }
+        });
+    }
+
+    volatile boolean artReady;          // strips may be loaded lazily (after prepareArt, or if it couldn't run)
+
+    /** Most pictures a strip ever shows (landscape), so turning the phone needs no new fetch. */
+    static int maxThumbs() {
+        Shell s = Shell.instance;
+        int w = Math.max(s.lw(), s.lh());
+        int railX = Math.max(36, w / 6);
+        int pw = w - (railX + 10) - 6 - 16;
+        return Math.max(1, (pw + 2) / (thumb() + 2));
+    }
+
+    private String artKey(Entry e) {
+        return app.lms.host + "|" + e.sec + "|" + e.spotty + "|" + thumb();
+    }
+
+    /**
+     * Once the sources are known: shows every cached strip at once, and if any is missing or a
+     * few days old, puts RefreshScreen on top to fetch those with a progress bar. Runs off the
+     * UI thread (it reads RMS).
+     */
+    void prepareArt() {
+        Vector todo = new Vector();
+        int[] rail = RAIL;
+        for (int r = 0; r < rail.length; r++) {
+            Vector v = sections[rail[r]];
+            for (int k = 0; k < v.size(); k++) {
+                Entry e = (Entry) v.elementAt(k);
+                if (e.preview != P_THUMBS || e.spotty == null) continue;
+                Object[] c = ArtCache.get(artKey(e));
+                if (c != null) e.thumbs = decode((Vector) c[1]);
+                long age = c == null ? -1 : System.currentTimeMillis() - ((Long) c[0]).longValue();
+                if (c == null || age < 0 || age >= ArtCache.MAX_AGE) {
+                    e.loading = true;                   // RefreshScreen has it
+                    todo.addElement(e);
+                }
+            }
+        }
+        artReady = true;
+        app.shell.repaint();
+        if (todo.size() == 0) return;
+        final RefreshScreen rs = new RefreshScreen(app, this, todo, maxThumbs());
+        app.display.callSerially(new Runnable() {
+            public void run() {
+                app.shell.push(rs);
+                rs.start();
+            }
+        });
+    }
+
+    /** Fetches an entry's strip from the server, keeps it in ArtCache and shows it; false if it failed. */
+    boolean fetchStrip(Entry e, RefreshScreen progress) {
+        int count = maxThumbs();
+        Vector imgs = new Vector(), raw = new Vector();
+        try {
+            Vector items = e.spotty.startsWith("local:") ? app.peekLocal(e.spotty.substring(6), count)
+                    : app.peek(e.sec, e.spotty, count);
+            for (int k = 0; k < items.size() && k < count; k++) {
+                Item it = (Item) items.elementAt(k);
+                byte[] b = null;
+                try {
+                    String url = app.lms.art(it.icon, thumb());
+                    if (url != null) b = app.lms.imageBytes(url);
+                } catch (Exception ignored) {}
+                raw.addElement(b);
+                imgs.addElement(decode(b));
+                if (progress != null) progress.picture();
+            }
+        } catch (Exception ex) {
+            app.log("Home artwork, " + e.label + ": " + ex.getMessage());
+            return false;
+        }
+        ArtCache.put(artKey(e), raw);
+        e.thumbs = imgs;
+        app.shell.repaint();
+        return true;
     }
 
     private static Vector decode(Vector raw) {
@@ -356,7 +442,7 @@ final class HomeScreen extends Screen implements Runnable {
             int count = Math.max(1, (pw + 2) / (t + 2));
             int x0 = px + (pw - (count * (t + 2) - 2)) / 2;
             Vector th = e.thumbs;
-            if (th == null && !e.loading) loadThumbs(e, count);
+            if (th == null && !e.loading && artReady) loadThumbs(e);
             for (int k = 0; k < count; k++) {
                 int x = x0 + k * (t + 2);
                 Image img = th != null && k < th.size() ? (Image) th.elementAt(k) : null;
@@ -395,48 +481,14 @@ final class HomeScreen extends Screen implements Runnable {
         return "";
     }
 
-    private void loadThumbs(final Entry e, final int count) {
+    /** A strip not prepared up front (Skip, or the source check failed): the cache, else the server. */
+    private void loadThumbs(final Entry e) {
         e.loading = true;
         LegacyLyrion.bg(new Runnable() {
             public void run() {
-                // cached strip first; only go to the server when there's none or it's a few days old
-                String key = app.lms.host + "|" + e.spotty + "|" + count + "|" + thumb();
-                Object[] cached = ArtCache.get(key);
-                if (cached != null) {
-                    e.thumbs = decode((Vector) cached[1]);
-                    app.shell.repaint();
-                    long age = System.currentTimeMillis() - ((Long) cached[0]).longValue();
-                    if (age >= 0 && age < ArtCache.MAX_AGE) return;
-                }
-                Vector imgs = new Vector(), raw = new Vector();
-                boolean ok = false;
-                try {
-                    Vector items = e.spotty.startsWith("local:") ? app.peekLocal(e.spotty.substring(6), count)
-                            : app.peek(e.spotty, count);
-                    for (int k = 0; k < items.size() && k < count; k++) {
-                        Item it = (Item) items.elementAt(k);
-                        byte[] b = null;
-                        try {
-                            String url = app.lms.art(it.icon, thumb());
-                            if (url != null) b = app.lms.imageBytes(url);
-                        } catch (Exception ignored) {}
-                        raw.addElement(b);
-                        imgs.addElement(decode(b));
-                        if (cached == null) {               // nothing on screen yet: show them as they come
-                            e.thumbs = imgs;
-                            app.shell.repaint();
-                        }
-                    }
-                    ok = true;
-                } catch (Exception ex) {
-                    app.log("Home artwork: " + ex.getMessage());
-                }
-                if (ok) {
-                    ArtCache.put(key, raw);
-                    e.thumbs = imgs;
-                } else if (cached == null) {
-                    e.thumbs = imgs;                        // offline: keep the stale strip if there was one
-                }
+                Object[] cached = ArtCache.get(artKey(e));
+                if (cached != null) e.thumbs = decode((Vector) cached[1]);
+                else if (!fetchStrip(e, null)) e.thumbs = new Vector();
                 app.shell.repaint();
             }
         });

@@ -326,8 +326,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         if (c == cArt) {                                // home artwork strips are cached for a few days
             ArtCache.clear();
             display.setCurrent(shell);
-            if (HomeScreen.last != null) HomeScreen.last.refreshArt();
-            shell.toast("Artwork will be fetched again");
+            if (HomeScreen.last != null) HomeScreen.last.refreshArt();   // shows "Refreshing library"
             return;
         }
         if (c == cUpdates) {
@@ -435,9 +434,13 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                     r = lms.call("", new String[]{"apps", "0", "100"});
                 } catch (Exception e) {
                     log("Sources: can't ask the server (" + e.getMessage() + ")");
+                    home.artReady = true;                       // strips load as they're shown
                     return;
                 }
-                if (r == null) return;
+                if (r == null) {
+                    home.artReady = true;
+                    return;
+                }
                 Vector loop = Json.arr(r, "appss_loop");      // absent when the server has no apps at all
                 boolean spotty = false, youtube = false;
                 for (int k = 0; loop != null && k < loop.size(); k++) {
@@ -448,6 +451,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
                 log("Sources: Spotify " + (spotty ? "yes" : "no") + ", YouTube Music " + (youtube ? "yes" : "no"));
                 boolean first = !sourceSaved;
                 home.setAvailable(spotty, youtube);
+                home.prepareArt();                              // cached artwork, or "Refreshing library"
                 if (!first) return;
                 if (spotty && youtube) {
                     home.setSection(HomeScreen.SPOTIFY);
@@ -565,8 +569,21 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
 
     /** First few entries of a top-level Spotty menu ("Home", "Playlists"), for artwork previews. */
     Vector peek(String spottyTitle, int n) throws Exception {
-        Item it = topItem(spottyTitle);
-        String[] cmd = it == null ? null : it.command(Json.obj(appTop, "base"), "go", n);
+        return peek(source, spottyTitle, n);
+    }
+
+    /** As above for a given section, whichever source is showing (RefreshScreen fetches them all). */
+    Vector peek(int section, String spottyTitle, int n) throws Exception {
+        String app = section == HomeScreen.YOUTUBE ? "youtubemusic" : "spotty";
+        Hashtable top = appTop;
+        if (top == null || !app.equals(appTopCmd)) top = lms.call(player, new String[]{app, "items", "0", "100", "menu:" + app});
+        Item it = null;
+        Vector tv = Lms.items(top);
+        for (int k = 0; k < tv.size(); k++) {
+            Item t = (Item) tv.elementAt(k);
+            if (t.title.equalsIgnoreCase(spottyTitle)) it = t;
+        }
+        String[] cmd = it == null ? null : it.command(Json.obj(top, "base"), "go", n);
         if (cmd == null) return new Vector();
         Hashtable r = lms.call(player, cmd);
         Vector v = Lms.items(r);

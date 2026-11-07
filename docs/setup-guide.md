@@ -177,7 +177,9 @@ The Aino doesn't tell Java apps whether it is charging, so docked mode goes by p
 
 Install the **LegacyLyrion Updates** plugin on your Lyrion server and the app updates itself over your home network (these phones can't reach GitHub any more). On start it checks quietly, and *Settings → Check for updates* checks on demand. When a newer version is there, it shows what's new with *Update*, *Later* and *Skip this version*; *Update* opens the phone's installer, and your settings are kept. Without the plugin, nothing happens.
 
-The artwork strips on the home menu (Recently added, Albums, Made for you, Playlists) are kept on the phone, so the start screen doesn't fetch them on every launch. They refresh by themselves in the background after three and a half days, about twice a week; *Settings → Refresh artwork* fetches them again straight away, for example after adding albums.
+The artwork strips on the home menu (Recently added, Albums, Made for you, Playlists) are kept on the phone, so the start screen doesn't fetch them on every launch. On the first start, and again once they are three and a half days old (about twice a week), a *Refreshing library* screen fetches them all with a progress bar, so nothing loads while you scroll; *Skip* goes straight to the menu. *Settings → Refresh artwork* does it again straight away, for example after adding albums.
+
+On the Aino, lists and the home menu keep gliding when you let go mid-swipe, slowing down by themselves; touch the screen to stop them.
 
 ## Standby wallpaper
 

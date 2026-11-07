@@ -590,7 +590,56 @@ final class Shell extends Canvas {
             pressY = y;
             lastY = y;
             dragging = false;
+            swallowTap = flinging;          // a touch that stops a glide only stops it
+            flinging = false;
+            flingGen++;
+            vel = 0;
+            lastT = System.currentTimeMillis();
         }
+    }
+
+    // ------------------------------------------------------------------ momentum
+    // The finger's speed is tracked while dragging; let go while it's moving and the screen keeps
+    // getting drag() steps that slow down by friction, so lists and the home menu glide.
+
+    private long lastT;
+    private int vel;                        // pixels per second, smoothed
+    private volatile int flingGen;
+    private volatile boolean flinging;
+    private boolean swallowTap;
+
+    private void fling(final Screen s, int v) {
+        final int gen = ++flingGen;
+        final int v0 = Math.max(-3000, Math.min(3000, v));
+        flinging = true;
+        new Thread(new Runnable() {
+            public void run() {
+                int v = v0, acc = 0;
+                long last = System.currentTimeMillis();
+                try {
+                    while (gen == flingGen && top() == s && Math.abs(v) > 60) {
+                        try { Thread.sleep(25); } catch (InterruptedException e) { break; }
+                        long now = System.currentTimeMillis();
+                        int dt = (int) Math.min(100, now - last);
+                        last = now;
+                        acc += v * dt;                  // thousandths of a pixel
+                        final int step = acc / 1000;
+                        acc -= step * 1000;
+                        for (int k = dt; k > 0; k -= 25) v = v * 94 / 100;   // friction
+                        if (step != 0 && gen == flingGen) {
+                            app.display.callSerially(new Runnable() {
+                                public void run() {
+                                    if (gen == flingGen && top() == s) s.drag(step);
+                                }
+                            });
+                            repaint();
+                        }
+                    }
+                } finally {
+                    if (gen == flingGen) flinging = false;
+                }
+            }
+        }).start();
     }
 
     protected void pointerDragged(int x, int y) {
@@ -605,6 +654,13 @@ final class Shell extends Canvas {
             Screen s = top();
             int hh = headerH();
             if (s != null && pressY > hh && pressY < lh() - softH() - miniH()) s.drag(y - lastY);
+            long now = System.currentTimeMillis();
+            int dt = (int) (now - lastT);
+            if (dt > 0) {
+                int inst = (y - lastY) * 1000 / dt;
+                vel = (vel + inst * 3) / 4;             // smoothed, the latest movement counts most
+            }
+            lastT = now;
             lastY = y;
             repaint();
         }
@@ -619,6 +675,14 @@ final class Shell extends Canvas {
     private void release(int x, int y) {
         if (dragging) {
             dragging = false;
+            Screen s = top();
+            boolean moving = System.currentTimeMillis() - lastT < 80;   // not if the finger stopped first
+            if (s != null && menu == null && moving && Math.abs(vel) > 250
+                    && pressY > headerH() && pressY < lh() - softH() - miniH()) fling(s, vel);
+            return;
+        }
+        if (swallowTap) {
+            swallowTap = false;
             return;
         }
         Screen s = top();
