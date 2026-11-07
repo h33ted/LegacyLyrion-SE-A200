@@ -373,7 +373,8 @@ final class HomeScreen extends Screen implements Runnable {
             app.log("Home artwork, " + e.label + ": " + ex.getMessage());
             return false;
         }
-        ArtCache.put(artKey(e), raw);
+        String err = ArtCache.put(artKey(e), raw);
+        if (err != null) app.log("Home artwork, " + e.label + ": not saved (" + err + ")");
         e.thumbs = imgs;
         app.shell.repaint();
         return true;
@@ -570,11 +571,20 @@ final class HomeScreen extends Screen implements Runnable {
     void drag(int dy) {
         dragAcc += dy;
         int P = pitch();
-        while (dragAcc <= -P / 2) {                 // finger up: next entry
+        int n = entries.size();
+        while (dragAcc <= -P / 2) {                 // finger up: next entry; touch stops at the ends
+            if (focus >= n - 1) {
+                dragAcc = 0;
+                break;
+            }
             dragAcc += P;
             move(focus + 1);
         }
         while (dragAcc >= P / 2) {
+            if (focus <= 0) {
+                dragAcc = 0;
+                break;
+            }
             dragAcc -= P;
             move(focus - 1);
         }

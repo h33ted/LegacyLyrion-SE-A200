@@ -12,8 +12,8 @@ import javax.microedition.rms.RecordStore;
  * The home menu's artwork strips (Recently added, Albums, Made for you...), kept in RMS so the
  * start screen doesn't ask the server for them on every launch. A strip older than MAX_AGE is
  * still shown straight away and fetched again in the background, so it refreshes about twice a
- * week. One small record store per strip ("llart" + a hash of its key), so a lookup reads only
- * that strip; Settings > Refresh artwork clears them all.
+ * week. One small record store per strip ("llart" + a hash of its key, a record per picture), so a
+ * lookup reads only that strip; Settings > Refresh artwork clears them all.
  */
 final class ArtCache {
     static final long MAX_AGE = 84L * 3600 * 1000;      // 3.5 days
@@ -33,15 +33,11 @@ final class ArtCache {
             if (!in.readUTF().equals(key)) return null;             // a hash clash: treat as missing
             long t = in.readLong();
             int n = in.readInt();
+            if (rs.getNumRecords() < n + 1) return null;            // half written
             Vector v = new Vector();
             for (int k = 0; k < n; k++) {
-                int len = in.readInt();
-                byte[] b = null;
-                if (len > 0) {
-                    b = new byte[len];
-                    in.readFully(b);
-                }
-                v.addElement(b);
+                byte[] b = rs.getRecord(k + 2);
+                v.addElement(b == null || b.length <= 1 ? null : b);
             }
             return new Object[]{new Long(t), v};
         } catch (Exception e) {
@@ -51,26 +47,39 @@ final class ArtCache {
         }
     }
 
-    static synchronized void put(String key, Vector images) {
+    /**
+     * Saves a strip: a small header record, then one record per picture (records 2...), since
+     * some phones refuse one large record. Returns null, or why it couldn't be saved.
+     */
+    static synchronized String put(String key, Vector images) {
         RecordStore rs = null;
+        int bytes = 0;
         try {
+            try { RecordStore.deleteRecordStore(store(key)); } catch (Exception ignored) {}   // ids start at 1 again
             ByteArrayOutputStream bo = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(bo);
             out.writeUTF(key);
             out.writeLong(System.currentTimeMillis());
             out.writeInt(images.size());
+            out.flush();
+            byte[] head = bo.toByteArray();
+            rs = RecordStore.openRecordStore(store(key), true);
+            rs.addRecord(head, 0, head.length);
+            byte[] none = {0};
             for (int k = 0; k < images.size(); k++) {
                 byte[] b = (byte[]) images.elementAt(k);
-                out.writeInt(b == null ? 0 : b.length);
-                if (b != null) out.write(b);
+                if (b == null || b.length == 0) b = none;
+                bytes += b.length;
+                rs.addRecord(b, 0, b.length);
             }
-            out.flush();
-            byte[] r = bo.toByteArray();
-            rs = RecordStore.openRecordStore(store(key), true);
-            if (rs.getNumRecords() == 0) rs.addRecord(r, 0, r.length);
-            else rs.setRecord(1, r, 0, r.length);
+            return null;
         } catch (Exception e) {
-            // a full phone just means no cache; the strip is still shown
+            String free = "";
+            try { if (rs != null) free = ", " + rs.getSizeAvailable() / 1024 + " KB free"; } catch (Exception ignored) {}
+            try { if (rs != null) rs.closeRecordStore(); } catch (Exception ignored) {}
+            rs = null;
+            try { RecordStore.deleteRecordStore(store(key)); } catch (Exception ignored) {}
+            return e + " at " + bytes / 1024 + " KB" + free;
         } finally {
             try { if (rs != null) rs.closeRecordStore(); } catch (Exception ignored) {}
         }

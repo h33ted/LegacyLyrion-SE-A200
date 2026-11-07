@@ -1,6 +1,9 @@
 package ll;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Hashtable;
@@ -9,6 +12,7 @@ import java.util.Vector;
 import javax.microedition.io.Connector;
 import javax.microedition.io.HttpConnection;
 import javax.microedition.lcdui.Image;
+import javax.microedition.rms.RecordStore;
 
 /** Lyrion JSON-RPC over plain HTTP (no TLS needed on the LAN). Call from worker threads only. */
 final class Lms {
@@ -40,7 +44,91 @@ final class Lms {
         }
     }
 
+    static final long TOPS_AGE = 3L * 3600 * 1000;     // menus that rarely change: asked again every 3 hours
+
+    /**
+     * call() for replies that rarely change (the plugins' top menus, which plugins the server has):
+     * kept in RMS and reused for maxAge; also used, however old, when the server can't be asked.
+     * Only replies that contain the key need are kept, so an error ("not signed in") isn't.
+     */
+    Hashtable callCached(String player, String[] cmd, long maxAge, String need) throws Exception {
+        StringBuffer kb = new StringBuffer(host).append('|').append(player == null ? "" : player);
+        for (int k = 0; k < cmd.length; k++) kb.append('|').append(cmd[k]);
+        String key = kb.toString();
+        String name = "lltop" + Integer.toHexString(key.hashCode());
+        String text = null;
+        long saved = -1;
+        RecordStore rs = null;
+        try {
+            rs = RecordStore.openRecordStore(name, false);
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(rs.getRecord(1)));
+            if (in.readUTF().equals(key)) {
+                saved = in.readLong();
+                byte[] t = new byte[in.readInt()];
+                in.readFully(t);
+                text = new String(t, "UTF-8");
+            }
+        } catch (Exception ignored) {
+        } finally {
+            try { if (rs != null) rs.closeRecordStore(); } catch (Exception ignored) {}
+        }
+        long age = System.currentTimeMillis() - saved;
+        if (text != null && age >= 0 && age < maxAge) {
+            Hashtable res = Json.obj(Json.parse(text), "result");
+            if (res != null) return res;
+        }
+        String fresh;
+        try {
+            fresh = sendText(player, cmd);
+        } catch (Exception e) {
+            if (text != null) {                                     // offline: the old copy is better than nothing
+                Hashtable res = Json.obj(Json.parse(text), "result");
+                if (res != null) return res;
+            }
+            throw e;
+        }
+        Hashtable res = Json.obj(Json.parse(fresh), "result");
+        if (res == null) throw new Exception("empty reply");
+        if (need == null || res.get(need) != null) {
+            rs = null;
+            try {
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                DataOutputStream out = new DataOutputStream(bo);
+                byte[] t = fresh.getBytes("UTF-8");
+                out.writeUTF(key);
+                out.writeLong(System.currentTimeMillis());
+                out.writeInt(t.length);
+                out.write(t);
+                out.flush();
+                byte[] r = bo.toByteArray();
+                rs = RecordStore.openRecordStore(name, true);
+                if (rs.getNumRecords() == 0) rs.addRecord(r, 0, r.length);
+                else rs.setRecord(1, r, 0, r.length);
+            } catch (Exception ignored) {
+            } finally {
+                try { if (rs != null) rs.closeRecordStore(); } catch (Exception ignored) {}
+            }
+        }
+        return res;
+    }
+
+    /** Forgets the cached menus (Settings > Refresh artwork does this too). */
+    static void clearCached() {
+        String[] names = RecordStore.listRecordStores();
+        for (int k = 0; names != null && k < names.length; k++) {
+            if (names[k].startsWith("lltop")) {
+                try { RecordStore.deleteRecordStore(names[k]); } catch (Exception ignored) {}
+            }
+        }
+    }
+
     private Hashtable send(String player, String[] cmd) throws Exception {
+        Hashtable res = Json.obj(Json.parse(sendText(player, cmd)), "result");
+        if (res == null) throw new Exception("empty reply");
+        return res;
+    }
+
+    private String sendText(String player, String[] cmd) throws Exception {
         StringBuffer b = new StringBuffer("{\"id\":1,\"method\":\"slim.request\",\"params\":[");
         b.append(Json.quote(player == null ? "" : player)).append(",[");
         for (int k = 0; k < cmd.length; k++) {
@@ -63,10 +151,7 @@ final class Lms {
             os.close();
             if (c.getResponseCode() != HttpConnection.HTTP_OK) throw new Exception("HTTP " + c.getResponseCode());
             in = c.openInputStream();
-            String text = new String(readAll(in), "UTF-8");
-            Hashtable res = Json.obj(Json.parse(text), "result");
-            if (res == null) throw new Exception("empty reply");
-            return res;
+            return new String(readAll(in), "UTF-8");
         } finally {
             try { if (in != null) in.close(); } catch (Exception e) {}
             try { if (c != null) c.close(); } catch (Exception e) {}

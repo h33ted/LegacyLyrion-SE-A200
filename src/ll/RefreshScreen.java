@@ -79,6 +79,10 @@ final class RefreshScreen extends Screen implements Runnable {
         g.setColor(Style.FRAME);
         g.drawRect(bx - 1, by - 1, bw + 1, bh + 1);
         g.setColor(Style.TEXT_FAINT);
-        g.drawString("Artwork is kept on the phone for a few days", w / 2, by + bh + 12, Graphics.TOP | Graphics.HCENTER);
+        Vector lines = Style.wrap("Artwork is kept on the phone for a few days", Style.SMALL, w - 32);
+        for (int k = 0; k < lines.size(); k++) {
+            g.drawString((String) lines.elementAt(k), w / 2, by + bh + 12 + k * Style.SMALL.getHeight(),
+                    Graphics.TOP | Graphics.HCENTER);
+        }
     }
 }

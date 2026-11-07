@@ -325,6 +325,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         }
         if (c == cArt) {                                // home artwork strips are cached for a few days
             ArtCache.clear();
+            Lms.clearCached();
             display.setCurrent(shell);
             if (HomeScreen.last != null) HomeScreen.last.refreshArt();   // shows "Refreshing library"
             return;
@@ -431,7 +432,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
             public void run() {
                 Hashtable r;
                 try {
-                    r = lms.call("", new String[]{"apps", "0", "100"});
+                    r = lms.callCached("", new String[]{"apps", "0", "100"}, Lms.TOPS_AGE, null);
                 } catch (Exception e) {
                     log("Sources: can't ask the server (" + e.getMessage() + ")");
                     home.artReady = true;                       // strips load as they're shown
@@ -576,7 +577,8 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     Vector peek(int section, String spottyTitle, int n) throws Exception {
         String app = section == HomeScreen.YOUTUBE ? "youtubemusic" : "spotty";
         Hashtable top = appTop;
-        if (top == null || !app.equals(appTopCmd)) top = lms.call(player, new String[]{app, "items", "0", "100", "menu:" + app});
+        if (top == null || !app.equals(appTopCmd))
+            top = lms.callCached(player, new String[]{app, "items", "0", "100", "menu:" + app}, Lms.TOPS_AGE, "item_loop");
         Item it = null;
         Vector tv = Lms.items(top);
         for (int k = 0; k < tv.size(); k++) {
@@ -896,7 +898,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     private Hashtable spottyTop() throws Exception {
         String app = appCmd();
         if (appTop == null || !app.equals(appTopCmd)) {
-            Hashtable r = lms.call(player, new String[]{app, "items", "0", "100", "menu:" + app});
+            Hashtable r = lms.callCached(player, new String[]{app, "items", "0", "100", "menu:" + app}, Lms.TOPS_AGE, "item_loop");
             if (Json.arr(r, "item_loop") == null) {
                 throw new Exception(source == HomeScreen.YOUTUBE ? "YouTube Music plugin is not installed"
                         : "Spotty is not installed or not signed in");
