@@ -218,6 +218,52 @@ final class Style {
         return Image.createRGBImage(px, w, h, true);
     }
 
+    private static Image halo;
+    private static int haloX = -99999, haloY, haloR, haloA, haloW, haloH;
+
+    /**
+     * Soft orange glow round an icon centred on (cx, cy), fading out over radius r; strength 0..255.
+     * Worked out from the background pixels and drawn solid (the Aino ignores image alpha), and
+     * cached, since only one icon glows at a time.
+     */
+    static void halo(Graphics g, int cx, int cy, int r, int strength) {
+        if (r < 2) return;
+        Shell s = Shell.instance;
+        int sw = s.lw(), sh = s.lh();
+        if (halo == null || haloX != cx || haloY != cy || haloR != r || haloA != strength || haloW != sw || haloH != sh) {
+            halo = makeHalo(cx, cy, r, strength, sw, sh);
+            haloX = cx;
+            haloY = cy;
+            haloR = r;
+            haloA = strength;
+            haloW = sw;
+            haloH = sh;
+        }
+        g.drawImage(halo, cx - r, cy - r, Graphics.TOP | Graphics.LEFT);
+    }
+
+    private static Image makeHalo(int cx, int cy, int r, int strength, int sw, int sh) {
+        int d = 2 * r, x = cx - r, y = cy - r;
+        int[] px = new int[d * d];
+        int x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(sw, x + d), y1 = Math.min(sh, y + d);
+        if (x1 > x0 && y1 > y0) glowFor(sw, sh).getRGB(px, (y0 - y) * d + (x0 - x), d, x0, y0, x1 - x0, y1 - y0);
+        int rr = r * r;
+        for (int j = 0; j < d; j++) {
+            int dy = j - r;
+            for (int i = 0; i < d; i++) {
+                int dx = i - r, q = dx * dx + dy * dy;
+                int p = px[j * d + i];
+                if (q < rr) {
+                    int f = (rr - q) * 1000 / rr;       // 1000 at the centre, 0 at the edge
+                    f = f * f / 1000;                   // soft falloff
+                    p = blend(p, ACCENT, strength * f / 1000);
+                }
+                px[j * d + i] = 0xff000000 | (p & 0xffffff);
+            }
+        }
+        return Image.createRGBImage(px, d, d, false);
+    }
+
     /** Thin orange-red frame around the focused row (the row text turns orange). */
     static void focusFrame(Graphics g, int x, int y, int w, int h) {
         g.setColor(FOCUS_FRAME);

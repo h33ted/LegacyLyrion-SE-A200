@@ -236,6 +236,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
     private final Command cLog = new Command("Diagnostics", Command.SCREEN, 3);
     private final Command cSaveLog = new Command("Save to file", Command.SCREEN, 1);
     private final Command cUpdates = new Command("Check for updates", Command.SCREEN, 4);
+    private final Command cArt = new Command("Refresh artwork", Command.SCREEN, 5);
     private final Command cSave = new Command("Save", Command.OK, 1);
     private final Command cBack = new Command("Back", Command.BACK, 2);
     private final Command cSearch = new Command("Search", Command.OK, 1);
@@ -283,6 +284,7 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         settingsForm.addCommand(cSave);
         settingsForm.addCommand(cLog);
         settingsForm.addCommand(cUpdates);
+        settingsForm.addCommand(cArt);
         if (!first) settingsForm.addCommand(cBack);
         settingsForm.setCommandListener(this);
         display.setCurrent(settingsForm);
@@ -319,6 +321,13 @@ public final class LegacyLyrion extends MIDlet implements CommandListener {
         }
         if (c == cLog) {
             showLog();
+            return;
+        }
+        if (c == cArt) {                                // home artwork strips are cached for a few days
+            ArtCache.clear();
+            display.setCurrent(shell);
+            if (HomeScreen.last != null) HomeScreen.last.refreshArt();
+            shell.toast("Artwork will be fetched again");
             return;
         }
         if (c == cUpdates) {

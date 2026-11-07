@@ -55,8 +55,11 @@ final class HomeScreen extends Screen implements Runnable {
     private int dragAcc;
     private boolean onRail;             // left key moved the focus to the source rail
 
+    static HomeScreen last;             // for Settings > Refresh artwork
+
     HomeScreen(LegacyLyrion app) {
         super(app, "LegacyLyrion");
+        last = this;
         leftLabel = "Hide";
     }
 
@@ -267,12 +270,42 @@ final class HomeScreen extends Screen implements Runnable {
     private long partRail, partEntries, partFocus;
 
     private void railIcon(Graphics g, int glyph, int x, int y, boolean on) {
-        if (on) {                                   // small orange tick on the rail marks the section
-            g.setColor(Style.ACCENT);
-            g.fillRect(railX - 1, y - 12, 3, 24);
-            if (onRail) Style.focusFrame(g, x - railX / 2 + 3, y - 17, railX - 6, 34);   // rail has the keys
+        if (on) {                                   // the section glows; brighter while the rail has the keys
+            int r = 22;
+            Style.halo(g, x, y, r, onRail ? 210 : 120);
+            g.setColor(0x3a3a3a);                   // the halo is drawn solid, so put the rail line back
+            g.drawLine(railX, y - r, railX, y + r);
+            g.setColor(0x1a1a1a);
+            g.drawLine(railX + 1, y - r, railX + 1, y + r);
         }
         Style.glyph(g, glyph, x, y, 26, on ? Style.ICON_FOCUS : 0x5a5a5a);
+    }
+
+    /** Forgets the artwork strips so they're fetched again (Settings > Refresh artwork). */
+    void refreshArt() {
+        for (int s = 0; s < sections.length; s++) {
+            for (int k = 0; k < sections[s].size(); k++) {
+                Entry e = (Entry) sections[s].elementAt(k);
+                e.thumbs = null;
+                e.loading = false;
+            }
+        }
+        app.shell.repaint();
+    }
+
+    private static Vector decode(Vector raw) {
+        Vector v = new Vector();
+        for (int k = 0; k < raw.size(); k++) v.addElement(decode((byte[]) raw.elementAt(k)));
+        return v;
+    }
+
+    private static Image decode(byte[] b) {
+        if (b == null) return null;
+        try {
+            return Image.createImage(b, 0, b.length);
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private void paintFocus(Graphics g, Entry e, int w, int iconX, int textX, int P, int bh) {
@@ -366,25 +399,44 @@ final class HomeScreen extends Screen implements Runnable {
         e.loading = true;
         LegacyLyrion.bg(new Runnable() {
             public void run() {
-                Vector imgs = new Vector();
+                // cached strip first; only go to the server when there's none or it's a few days old
+                String key = app.lms.host + "|" + e.spotty + "|" + count + "|" + thumb();
+                Object[] cached = ArtCache.get(key);
+                if (cached != null) {
+                    e.thumbs = decode((Vector) cached[1]);
+                    app.shell.repaint();
+                    long age = System.currentTimeMillis() - ((Long) cached[0]).longValue();
+                    if (age >= 0 && age < ArtCache.MAX_AGE) return;
+                }
+                Vector imgs = new Vector(), raw = new Vector();
+                boolean ok = false;
                 try {
                     Vector items = e.spotty.startsWith("local:") ? app.peekLocal(e.spotty.substring(6), count)
                             : app.peek(e.spotty, count);
                     for (int k = 0; k < items.size() && k < count; k++) {
                         Item it = (Item) items.elementAt(k);
-                        Image img = null;
+                        byte[] b = null;
                         try {
                             String url = app.lms.art(it.icon, thumb());
-                            if (url != null) img = app.lms.image(url);
+                            if (url != null) b = app.lms.imageBytes(url);
                         } catch (Exception ignored) {}
-                        imgs.addElement(img);
-                        e.thumbs = imgs;
-                        app.shell.repaint();
+                        raw.addElement(b);
+                        imgs.addElement(decode(b));
+                        if (cached == null) {               // nothing on screen yet: show them as they come
+                            e.thumbs = imgs;
+                            app.shell.repaint();
+                        }
                     }
+                    ok = true;
                 } catch (Exception ex) {
                     app.log("Home artwork: " + ex.getMessage());
                 }
-                e.thumbs = imgs;
+                if (ok) {
+                    ArtCache.put(key, raw);
+                    e.thumbs = imgs;
+                } else if (cached == null) {
+                    e.thumbs = imgs;                        // offline: keep the stale strip if there was one
+                }
                 app.shell.repaint();
             }
         });

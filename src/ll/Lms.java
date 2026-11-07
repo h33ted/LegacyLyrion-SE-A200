@@ -75,6 +75,17 @@ final class Lms {
 
     /** PNG artwork, resized by the server (phones of this age decode PNG reliably). */
     Image image(String path) {
+        byte[] d = imageBytes(path);
+        if (d == null) return null;
+        try {
+            return Image.createImage(d, 0, d.length);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** The undecoded PNG, for keeping in ArtCache; null on any failure. */
+    byte[] imageBytes(String path) {
         HttpConnection c = null;
         InputStream in = null;
         try {
@@ -82,8 +93,7 @@ final class Lms {
             c.setRequestProperty("Connection", "close");
             if (c.getResponseCode() != HttpConnection.HTTP_OK) return null;
             in = c.openInputStream();
-            byte[] d = readAll(in);
-            return Image.createImage(d, 0, d.length);
+            return readAll(in);
         } catch (Throwable t) {
             return null;
         } finally {
